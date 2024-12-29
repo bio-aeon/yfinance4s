@@ -1,6 +1,7 @@
 package org.coinductive.yfinance4s
 
 import cats.effect._
+import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 
 object Main extends IOApp {
 
