@@ -1,7 +1,7 @@
-package org.coinductive.yfinance4s
+package org.coinductive.yfinance4s.models
 
 import io.circe.generic.JsonCodec
-import org.coinductive.yfinance4s.YFinanceQueryResult.Chart
+import org.coinductive.yfinance4s.models.YFinanceQueryResult.Chart
 
 @JsonCodec
 final case class YFinanceQueryResult(chart: Chart)
@@ -28,5 +28,4 @@ object YFinanceQueryResult {
 
   @JsonCodec
   final case class AdjClose(adjclose: List[Double])
-
 }

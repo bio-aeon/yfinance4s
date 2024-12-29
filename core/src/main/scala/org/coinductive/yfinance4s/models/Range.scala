@@ -1,4 +1,4 @@
-package org.coinductive.yfinance4s
+package org.coinductive.yfinance4s.models
 
 import cats.Show
 import enumeratum.values.{StringEnum, StringEnumEntry}

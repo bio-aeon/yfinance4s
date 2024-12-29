@@ -5,6 +5,7 @@ import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.show._
 import io.circe.parser.decode
+import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
 import retry.{RetryPolicies, RetryPolicy, Sleep, retryingOnAllErrors}
 import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 import sttp.client3.{Response, SttpBackend, UriContext, basicRequest}
