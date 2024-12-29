@@ -8,12 +8,20 @@ import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
 import retry.{RetryPolicies, RetryPolicy, Sleep, retryingOnAllErrors}
 import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
-import sttp.client3.{Response, SttpBackend, UriContext, basicRequest}
+import sttp.client3.{Identity, RequestT, Response, SttpBackend, UriContext, basicRequest}
 
+import java.time.ZonedDateTime
 import scala.concurrent.duration.FiniteDuration
 
 trait Gateway[F[_]] {
   def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult]
+
+  def getChart(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime
+  ): F[YFinanceQueryResult]
 }
 
 object Gateway {
@@ -52,8 +60,32 @@ object Gateway {
           apiEndpoint.addPath(ticker.show).withParams(("interval", interval.show), ("range", range.show))
         )
 
+      sendRequest(req)
+    }
+
+    def getChart(
+        ticker: Ticker,
+        interval: Interval,
+        since: ZonedDateTime,
+        until: ZonedDateTime
+    ): F[YFinanceQueryResult] = {
+      val req =
+        basicRequest.get(
+          apiEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("interval", interval.show),
+              ("period1", since.toEpochSecond.show),
+              ("period2", until.toEpochSecond.show)
+            )
+        )
+
+      sendRequest(req)
+    }
+
+    private def sendRequest(request: RequestT[Identity, Either[String, String], Any]): F[YFinanceQueryResult] = {
       retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-        req.send(sttpBackend)
+        request.send(sttpBackend)
       }.flatMap(parseResponse)
     }
 
