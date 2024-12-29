@@ -8,7 +8,7 @@ import io.circe.parser.decode
 import sttp.client3.{Response, SttpBackend, UriContext, basicRequest}
 
 trait Gateway[F[_]] {
-  def getChart(ticker: String, interval: Interval, range: Range): F[YFinanceQueryResult]
+  def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult]
 }
 
 object Gateway {
@@ -20,9 +20,11 @@ object Gateway {
 
     private val apiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
 
-    def getChart(ticker: String, interval: Interval, range: Range): F[YFinanceQueryResult] = {
+    def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
-        basicRequest.get(apiEndpoint.addPath(ticker).withParams(("interval", interval.show), ("range", range.show)))
+        basicRequest.get(
+          apiEndpoint.addPath(ticker.show).withParams(("interval", interval.show), ("range", range.show))
+        )
       req.send(sttpBackend).flatMap(parseResponse)
     }
 
