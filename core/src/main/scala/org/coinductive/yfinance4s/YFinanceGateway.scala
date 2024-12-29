@@ -13,7 +13,7 @@ import sttp.client3.{Identity, RequestT, Response, SttpBackend, UriContext, basi
 import java.time.ZonedDateTime
 import scala.concurrent.duration.FiniteDuration
 
-trait Gateway[F[_]] {
+sealed trait YFinanceGateway[F[_]] {
   def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult]
 
   def getChart(
@@ -24,13 +24,13 @@ trait Gateway[F[_]] {
   ): F[YFinanceQueryResult]
 }
 
-object Gateway {
+private object YFinanceGateway {
 
   def resource[F[_]: Async](
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
       retries: Int
-  ): Resource[F, Gateway[F]] = {
+  ): Resource[F, YFinanceGateway[F]] = {
     val connectTimeoutMs = connectTimeout.toMillis.toInt
     val readTimeoutMs = readTimeout.toMillis.toInt
 
@@ -43,14 +43,14 @@ object Gateway {
       .map(apply[F](retries, _))
   }
 
-  def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): Gateway[F] = {
+  def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): YFinanceGateway[F] = {
     val retryPolicy = RetryPolicies.limitRetries(retries)
-    new GatewayImpl[F](sttpBackend, retryPolicy)
+    new YFinanceGatewayImpl[F](sttpBackend, retryPolicy)
   }
 
-  private final class GatewayImpl[F[_]: Sleep](sttpBackend: SttpBackend[F, Any], retryPolicy: RetryPolicy[F])(implicit
-      F: Sync[F]
-  ) extends Gateway[F] {
+  private final class YFinanceGatewayImpl[F[_]: Sleep](sttpBackend: SttpBackend[F, Any], retryPolicy: RetryPolicy[F])(
+      implicit F: Sync[F]
+  ) extends YFinanceGateway[F] {
 
     private val apiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
 
