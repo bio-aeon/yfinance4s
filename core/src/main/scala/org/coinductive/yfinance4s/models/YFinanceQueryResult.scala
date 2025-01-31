@@ -7,7 +7,7 @@ import org.coinductive.yfinance4s.models.YFinanceQueryResult.Chart
 @JsonCodec
 private[yfinance4s] final case class YFinanceQueryResult(chart: Chart)
 
-object YFinanceQueryResult {
+private[yfinance4s] object YFinanceQueryResult {
 
   @JsonCodec
   private[yfinance4s] final case class Chart(result: List[InstrumentData])
