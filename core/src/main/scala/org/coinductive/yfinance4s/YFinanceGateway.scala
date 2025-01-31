@@ -1,14 +1,12 @@
 package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
-import cats.syntax.either._
-import cats.syntax.flatMap._
 import cats.syntax.show._
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
-import retry.{RetryPolicies, RetryPolicy, Sleep, retryingOnAllErrors}
+import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
-import sttp.client3.{Identity, RequestT, Response, SttpBackend, UriContext, basicRequest}
+import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
 import java.time.ZonedDateTime
 import scala.concurrent.duration.FiniteDuration
@@ -48,19 +46,24 @@ private object YFinanceGateway {
     new YFinanceGatewayImpl[F](sttpBackend, retryPolicy)
   }
 
-  private final class YFinanceGatewayImpl[F[_]: Sleep](sttpBackend: SttpBackend[F, Any], retryPolicy: RetryPolicy[F])(
-      implicit F: Sync[F]
-  ) extends YFinanceGateway[F] {
+  private final class YFinanceGatewayImpl[F[_]](
+      protected val sttpBackend: SttpBackend[F, Any],
+      protected val retryPolicy: RetryPolicy[F]
+  )(implicit
+      protected val F: Sync[F],
+      protected val S: Sleep[F]
+  ) extends HTTPBase[F]
+      with YFinanceGateway[F] {
 
-    private val apiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
+    private val ApiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
         basicRequest.get(
-          apiEndpoint.addPath(ticker.show).withParams(("interval", interval.show), ("range", range.show))
+          ApiEndpoint.addPath(ticker.show).withParams(("interval", interval.show), ("range", range.show))
         )
 
-      sendRequest(req)
+      sendRequest(req, parseContent)
     }
 
     def getChart(
@@ -71,7 +74,7 @@ private object YFinanceGateway {
     ): F[YFinanceQueryResult] = {
       val req =
         basicRequest.get(
-          apiEndpoint
+          ApiEndpoint
             .addPath(ticker.show)
             .withParams(
               ("interval", interval.show),
@@ -80,32 +83,15 @@ private object YFinanceGateway {
             )
         )
 
-      sendRequest(req)
+      sendRequest(req, parseContent)
     }
 
-    private def sendRequest(request: RequestT[Identity, Either[String, String], Any]): F[YFinanceQueryResult] = {
-      retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-        request.send(sttpBackend)
-      }.flatMap(parseResponse)
-    }
-
-    private def parseResponse(
-        response: Response[Either[String, String]]
-    ): F[YFinanceQueryResult] = {
-      if (response.isSuccess) {
-        response.body
-          .leftMap(r => new Exception(s"Inconsistent response: $r"))
-          .fold(
-            F.raiseError,
-            decode[YFinanceQueryResult](_)
-              .fold(
-                e => F.raiseError(new Exception(s"Illegible response: ${e.getMessage}")),
-                F.pure
-              )
-          )
-      } else {
-        F.raiseError(new Exception(s"Unexpected code: ${response.code}. Details: ${response.body.merge}"))
-      }
+    private def parseContent(content: String): F[YFinanceQueryResult] = {
+      decode[YFinanceQueryResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Illegible response: ${e.getMessage}")),
+          F.pure
+        )
     }
 
   }

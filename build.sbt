@@ -14,6 +14,7 @@ val sttpV = "3.10.1"
 val catsRetryV = "3.1.3"
 val enumeratumV = "1.7.5"
 val newtypeV = "0.4.4"
+val jsoupV = "1.18.3"
 val munitCatsEffectV = "1.0.7"
 
 lazy val core = (project in file("core"))
@@ -36,6 +37,7 @@ lazy val core = (project in file("core"))
       "com.github.cb372" %% "cats-retry" % catsRetryV,
       "com.beachape" %% "enumeratum" % enumeratumV,
       "io.estatico" %% "newtype" % newtypeV,
+      "org.jsoup" % "jsoup" % jsoupV,
       "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectV % Test,
     )
   )
