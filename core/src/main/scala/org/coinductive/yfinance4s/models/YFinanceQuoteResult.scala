@@ -1,22 +1,66 @@
 package org.coinductive.yfinance4s.models
 
 import cats.syntax.either._
+import cats.syntax.traverse._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser.decode
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
-import org.coinductive.yfinance4s.models.YFinanceQuoteResult.Body
+import org.coinductive.yfinance4s.models.YFinanceQuoteResult.{Fundamentals, Summary}
 
-private[yfinance4s] final case class YFinanceQuoteResult(body: Body)
+private[yfinance4s] final case class YFinanceQuoteResult(summary: Summary, fundamentals: Fundamentals)
 
 private[yfinance4s] object YFinanceQuoteResult {
 
-  private[yfinance4s] final case class Body(quoteSummary: QuoteSummary)
+  private[yfinance4s] final case class Summary(body: SummaryBody)
 
-  private[yfinance4s] object Body {
-    implicit val decoder: Decoder[Body] = deriveDecoder
+  object Summary {
+    implicit val decoder: Decoder[Summary] =
+      (c: HCursor) => {
+        for {
+          bodyStr <- c.downField("body").as[String]
+          body <- decode[SummaryBody](bodyStr).leftMap(DecodingFailure.fromThrowable(_, Nil))
+        } yield Summary(body)
+      }
+  }
+
+  private[yfinance4s] final case class Fundamentals(body: FundamentalsBody)
+
+  object Fundamentals {
+    implicit val decoder: Decoder[Fundamentals] =
+      (c: HCursor) => {
+        for {
+          bodyStr <- c.downField("body").as[String]
+          body <- decode[FundamentalsBody](bodyStr).leftMap(DecodingFailure.fromThrowable(_, Nil))
+        } yield Fundamentals(body)
+      }
+  }
+
+  private[yfinance4s] final case class SummaryBody(quoteSummary: QuoteSummary)
+
+  private[yfinance4s] object SummaryBody {
+    implicit val decoder: Decoder[SummaryBody] = deriveDecoder
+  }
+
+  private[yfinance4s] final case class FundamentalsBody(timeseries: TimeSeries)
+
+  private[yfinance4s] object FundamentalsBody {
+    implicit val decoder: Decoder[FundamentalsBody] = deriveDecoder
   }
 
   private[yfinance4s] final case class QuoteSummary(result: List[QuoteData])
+
+  private[yfinance4s] final case class TimeSeries(result: Option[TimeSeriesData])
+
+  private[yfinance4s] object TimeSeries {
+    implicit val decoder: Decoder[TimeSeries] =
+      (c: HCursor) => {
+        for {
+          result <- c.downField("result").as[List[Json]]
+          dataJson = result.find(_.asObject.exists(_.contains("trailingPegRatio")))
+          data <- dataJson.traverse(_.as[TimeSeriesData].leftMap(DecodingFailure.fromThrowable(_, Nil)))
+        } yield TimeSeries(data)
+      }
+  }
 
   private[yfinance4s] object QuoteSummary {
     implicit val decoder: Decoder[QuoteSummary] = deriveDecoder
@@ -43,7 +87,6 @@ private[yfinance4s] object YFinanceQuoteResult {
       shortPercentOfFloat: Value[Double],
       impliedSharesOutstanding: Value[Long],
       netIncomeToCommon: Value[Double],
-      pegRatio: Value[Option[Float]],
       enterpriseToRevenue: Value[Float],
       enterpriseToEbitda: Value[Float],
       bookValue: Option[Value[Double]],
@@ -114,17 +157,21 @@ private[yfinance4s] object YFinanceQuoteResult {
     implicit val decoder: Decoder[Price] = deriveDecoder
   }
 
+  private[yfinance4s] final case class TimeSeriesData(trailingPegRatio: List[TrailingPegRatio])
+
+  private[yfinance4s] object TimeSeriesData {
+    implicit val decoder: Decoder[TimeSeriesData] = deriveDecoder
+  }
+
+  private[yfinance4s] final case class TrailingPegRatio(reportedValue: Value[Double])
+
+  private[yfinance4s] object TrailingPegRatio {
+    implicit val decoder: Decoder[TrailingPegRatio] = deriveDecoder
+  }
+
   private[yfinance4s] final case class Value[A](raw: A)
 
   private[yfinance4s] object Value {
     implicit def decoder[A: Decoder]: Decoder[Value[A]] = deriveDecoder
   }
-
-  implicit val decoder: Decoder[YFinanceQuoteResult] =
-    (c: HCursor) => {
-      for {
-        bodyStr <- c.downField("body").as[String]
-        body <- decode[Body](bodyStr).leftMap(DecodingFailure.fromThrowable(_, Nil))
-      } yield YFinanceQuoteResult(body)
-    }
 }

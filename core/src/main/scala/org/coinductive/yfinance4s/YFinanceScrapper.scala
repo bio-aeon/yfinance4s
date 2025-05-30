@@ -1,15 +1,16 @@
 package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
+import cats.syntax.apply._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import cats.syntax.show._
-import cats.syntax.traverse._
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.{Ticker, YFinanceQuoteResult}
 import org.jsoup.Jsoup
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
-import sttp.model.{Header, HeaderNames}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
@@ -54,44 +55,45 @@ private object YFinanceScrapper {
 
     private val QuoteEndpoint = uri"https://finance.yahoo.com/quote/"
     private val QuoteSummaryUrl = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
-
-    private val UserAgentHeader = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0"
+    private val FundamentalsTimeSeriesUrl =
+      "https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
 
     def getQuote(ticker: Ticker): F[Option[YFinanceQuoteResult]] = {
-      val req =
-        basicRequest
-          .headers(
-            Header(
-              HeaderNames.UserAgent,
-              UserAgentHeader
-            )
-          )
-          .get(QuoteEndpoint.addPath(ticker.show))
-
+      val req = basicRequest.get(QuoteEndpoint.addPath(ticker.show))
       sendRequest(req, parseContent)
     }
 
     private def parseContent(content: String): F[Option[YFinanceQuoteResult]] = {
       val doc = Jsoup.parse(content)
       val elements = doc.select("script[data-sveltekit-fetched][data-url]")
-      elements.asScala
-        .flatMap { element =>
-          val dataUrl = element.attr("data-url")
-          if (dataUrl.contains(QuoteSummaryUrl)) {
+      val (maybeSummary, maybeFundamentals) =
+        elements.asScala.foldLeft[(Option[String], Option[String])]((None, None)) {
+          case ((summaryStr, fundamentalsStr), element) =>
+            val dataUrl = element.attr("data-url")
             val jsonData = element.html
-            Either.cond(jsonData.nonEmpty, Some(jsonData), None).merge
-          } else {
-            None
-          }
+            if (dataUrl.contains(QuoteSummaryUrl)) {
+              (Either.cond(jsonData.nonEmpty, Some(jsonData), None).merge, fundamentalsStr)
+            } else if (dataUrl.contains(FundamentalsTimeSeriesUrl)) {
+              (summaryStr, Either.cond(jsonData.nonEmpty, Some(jsonData), None).merge)
+            } else {
+              (summaryStr, fundamentalsStr)
+            }
         }
-        .headOption
-        .traverse { data =>
-          decode[YFinanceQuoteResult](data)
+
+      (maybeSummary, maybeFundamentals).traverseN { case (summaryStr, fundamentalsStr) =>
+        for {
+          summary <- decode[YFinanceQuoteResult.Summary](summaryStr)
             .fold(
-              e => F.raiseError(new Exception(s"Illegible quote data: ${e.getMessage}")),
+              e => F.raiseError(new Exception(s"Illegible quote summary: ${e.getMessage}")),
               F.pure
             )
-        }
+          fundamentals <- decode[YFinanceQuoteResult.Fundamentals](fundamentalsStr)
+            .fold(
+              e => F.raiseError(new Exception(s"Illegible quote fundamentals: ${e.getMessage}")),
+              F.pure
+            )
+        } yield YFinanceQuoteResult(summary, fundamentals)
+      }
     }
 
   }
