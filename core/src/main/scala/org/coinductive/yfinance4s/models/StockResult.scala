@@ -39,7 +39,7 @@ final case class StockResult(
     shortPercentOfFloat: Double,
     impliedSharesOutstanding: Long,
     netIncomeToCommon: Double,
-    pegRatio: Option[Float],
+    pegRatio: Option[Double],
     enterpriseToRevenue: Float,
     enterpriseToEbitda: Float,
     bookValue: Option[Double],

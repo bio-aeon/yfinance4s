@@ -52,7 +52,7 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
   }
 
   private def mapQuoteResult(result: YFinanceQuoteResult) = {
-    result.body.quoteSummary.result.headOption.map { quoteData =>
+    result.summary.body.quoteSummary.result.headOption.map { quoteData =>
       val price = quoteData.price
       val profile = quoteData.summaryProfile
       val details = quoteData.summaryDetail
@@ -97,7 +97,8 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
         stats.shortPercentOfFloat.raw,
         stats.impliedSharesOutstanding.raw,
         stats.netIncomeToCommon.raw,
-        stats.pegRatio.raw,
+        result.fundamentals.body.timeseries.result
+          .flatMap(_.trailingPegRatio.headOption.map(_.reportedValue.raw)),
         stats.enterpriseToRevenue.raw,
         stats.enterpriseToEbitda.raw,
         stats.bookValue.map(_.raw),
