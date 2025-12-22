@@ -9,5 +9,6 @@ Everyone is expected to follow the [Scala Code of Conduct] when discussing the p
 Any questions, concerns, or moderation requests please contact a member of the project.
 
 - [Iver](mailto:coinductive@yahoo.com)
+- [Alexandr](mailto:alexandr@wps.su)
 
 [Scala Code of Conduct]: https://www.scala-lang.org/conduct/
