@@ -23,7 +23,10 @@ class YFinanceClientSpec extends CatsEffectSuite {
 
         val stockResult = stockResultOpt.get
         assertEquals(stockResult.symbol, "AAPL")
-        assert(stockResult.longName.contains("Apple"), s"Expected longName to contain 'Apple', got: ${stockResult.longName}")
+        assert(
+          stockResult.longName.contains("Apple"),
+          s"Expected longName to contain 'Apple', got: ${stockResult.longName}"
+        )
         assert(stockResult.exchangeName.nonEmpty, "Exchange name should not be empty")
       }
     }
