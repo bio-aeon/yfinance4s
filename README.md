@@ -7,7 +7,7 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Historical Data**: Fetch OHLCV (Open, High, Low, Close, Volume) price data with configurable intervals and date ranges
 - **Stock Fundamentals**: Retrieve comprehensive company data including financials, valuation ratios, and key statistics
 - **Purely Functional**: Built on Cats Effect 3 with `Resource`-based lifecycle management
-- **Cross-compiled**: Supports both Scala 2.13 and Scala 3
+- **Scala 2.13**: Built for Scala 2.13
 - **Retry Logic**: Built-in configurable retry policies for resilient API calls
 
 ## Usage
