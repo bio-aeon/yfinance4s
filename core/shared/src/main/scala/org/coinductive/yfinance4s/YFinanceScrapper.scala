@@ -6,14 +6,12 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.show._
 import io.circe.parser.decode
+import org.coinductive.yfinance4s.html.PlatformHtmlParser
 import org.coinductive.yfinance4s.models.{Ticker, YFinanceQuoteResult}
-import org.jsoup.Jsoup
 import retry.{RetryPolicies, RetryPolicy, Sleep}
-import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters._
 
 sealed trait YFinanceScrapper[F[_]] {
   def getQuote(ticker: Ticker): F[Option[YFinanceQuoteResult]]
@@ -25,19 +23,8 @@ private object YFinanceScrapper {
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
       retries: Int
-  ): Resource[F, YFinanceScrapper[F]] = {
-    val connectTimeoutMs = connectTimeout.toMillis.toInt
-    val readTimeoutMs = readTimeout.toMillis.toInt
-
-    AsyncHttpClientCatsBackend
-      .resourceUsingConfigBuilder[F](
-        _.setConnectTimeout(connectTimeoutMs)
-          .setReadTimeout(readTimeoutMs)
-          .setRequestTimeout(readTimeoutMs)
-          .setHttpClientCodecMaxHeaderSize(32768)
-      )
-      .map(apply[F](retries, _))
-  }
+  ): Resource[F, YFinanceScrapper[F]] =
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _))
 
   def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): YFinanceScrapper[F] = {
     val retryPolicy = RetryPolicies.limitRetries(retries)
@@ -64,10 +51,10 @@ private object YFinanceScrapper {
     }
 
     private def parseContent(content: String): F[Option[YFinanceQuoteResult]] = {
-      val doc = Jsoup.parse(content)
+      val doc = PlatformHtmlParser.parse(content)
       val elements = doc.select("script[data-sveltekit-fetched][data-url]")
       val (maybeSummary, maybeFundamentals) =
-        elements.asScala.foldLeft[(Option[String], Option[String])]((None, None)) {
+        elements.foldLeft[(Option[String], Option[String])]((None, None)) {
           case ((summaryStr, fundamentalsStr), element) =>
             val dataUrl = element.attr("data-url")
             val jsonData = element.html

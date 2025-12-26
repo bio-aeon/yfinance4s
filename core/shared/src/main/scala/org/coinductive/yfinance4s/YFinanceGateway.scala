@@ -5,7 +5,6 @@ import cats.syntax.show._
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
 import retry.{RetryPolicies, RetryPolicy, Sleep}
-import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
 import java.time.ZonedDateTime
@@ -28,18 +27,8 @@ private object YFinanceGateway {
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
       retries: Int
-  ): Resource[F, YFinanceGateway[F]] = {
-    val connectTimeoutMs = connectTimeout.toMillis.toInt
-    val readTimeoutMs = readTimeout.toMillis.toInt
-
-    AsyncHttpClientCatsBackend
-      .resourceUsingConfigBuilder[F](
-        _.setConnectTimeout(connectTimeoutMs)
-          .setReadTimeout(readTimeoutMs)
-          .setRequestTimeout(readTimeoutMs)
-      )
-      .map(apply[F](retries, _))
-  }
+  ): Resource[F, YFinanceGateway[F]] =
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _))
 
   def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): YFinanceGateway[F] = {
     val retryPolicy = RetryPolicies.limitRetries(retries)
