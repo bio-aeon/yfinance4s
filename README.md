@@ -7,8 +7,16 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Historical Data**: Fetch OHLCV (Open, High, Low, Close, Volume) price data with configurable intervals and date ranges
 - **Stock Fundamentals**: Retrieve comprehensive company data including financials, valuation ratios, and key statistics
 - **Purely Functional**: Built on Cats Effect 3 with `Resource`-based lifecycle management
-- **Scala 2.13**: Built for Scala 2.13
-- **Retry Logic**: Built-in configurable retry policies for resilient API calls
+- **Cross-Platform**: Supports both JVM and Scala.js
+- **Scala 2.13 & Scala 3**: Compatible with Scala 2.13 and Scala 3
+
+## Scala.js Setup
+
+When using this library with Scala.js, you need to install the `node-html-parser` npm package:
+
+```bash
+npm install node-html-parser
+```
 
 ## Usage
 
