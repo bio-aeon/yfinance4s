@@ -1,10 +1,10 @@
 package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
-import cats.syntax.apply._
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.syntax.show._
+import cats.syntax.apply.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
+import cats.syntax.show.*
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.html.PlatformHtmlParser
 import org.coinductive.yfinance4s.models.{Ticker, YFinanceQuoteResult}

@@ -27,7 +27,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
 
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, _)) => Seq("-Ymacro-annotations")
+        case Some((2, _)) => Seq("-Ymacro-annotations", "-Xsource:3")
         case Some((3, _)) => Seq("-Yretain-trees")
         case _            => Seq.empty
       }

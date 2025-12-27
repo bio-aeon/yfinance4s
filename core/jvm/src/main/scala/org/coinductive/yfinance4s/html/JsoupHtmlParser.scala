@@ -2,7 +2,7 @@ package org.coinductive.yfinance4s.html
 
 import org.jsoup.Jsoup
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 object JsoupHtmlParser extends HtmlParser {
 

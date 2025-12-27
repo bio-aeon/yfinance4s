@@ -1,8 +1,8 @@
 package org.coinductive.yfinance4s
 
 import cats.effect.Sync
-import cats.syntax.either._
-import cats.syntax.flatMap._
+import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import retry.{RetryPolicy, Sleep, retryingOnAllErrors}
 import sttp.client3.{Identity, RequestT, Response, SttpBackend}
 
