@@ -1,7 +1,7 @@
 package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
-import cats.syntax.show._
+import cats.syntax.show.*
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
 import retry.{RetryPolicies, RetryPolicy, Sleep}

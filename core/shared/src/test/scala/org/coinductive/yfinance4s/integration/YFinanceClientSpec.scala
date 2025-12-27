@@ -1,10 +1,10 @@
 package org.coinductive.yfinance4s.integration
 
 import munit.CatsEffectSuite
-import cats.effect._
+import cats.effect.*
 import org.coinductive.yfinance4s.{YFinanceClient, YFinanceClientConfig}
 import org.coinductive.yfinance4s.models.Ticker
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class YFinanceClientSpec extends CatsEffectSuite {
 

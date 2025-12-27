@@ -1,7 +1,7 @@
 package org.coinductive.yfinance4s.models
 
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser.decode
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}

@@ -2,7 +2,7 @@ package org.coinductive.yfinance4s
 
 import cats.Functor
 import cats.effect.{Async, Resource}
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.{
   ChartResult,
   Interval,
