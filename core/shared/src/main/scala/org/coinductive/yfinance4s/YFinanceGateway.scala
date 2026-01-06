@@ -49,7 +49,9 @@ private object YFinanceGateway {
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
         basicRequest.get(
-          ApiEndpoint.addPath(ticker.show).withParams(("interval", interval.show), ("range", range.show))
+          ApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("interval", interval.show), ("range", range.show), ("events", "div,split"))
         )
 
       sendRequest(req, parseContent)
@@ -68,7 +70,8 @@ private object YFinanceGateway {
             .withParams(
               ("interval", interval.show),
               ("period1", since.toEpochSecond.show),
-              ("period2", until.toEpochSecond.show)
+              ("period2", until.toEpochSecond.show),
+              ("events", "div,split")
             )
         )
 
