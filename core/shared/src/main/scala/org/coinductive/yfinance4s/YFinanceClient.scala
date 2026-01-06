@@ -5,13 +5,17 @@ import cats.effect.{Async, Resource}
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.{
   ChartResult,
+  CorporateActions,
+  DividendEvent,
   Interval,
   Range,
+  SplitEvent,
   StockResult,
   Ticker,
   YFinanceQueryResult,
   YFinanceQuoteResult
 }
+import org.coinductive.yfinance4s.models.YFinanceQueryResult.InstrumentData
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
@@ -31,6 +35,111 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
     scrapper.getQuote(ticker).map(_.flatMap(mapQuoteResult))
   }
 
+  /** Retrieves dividend history for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol (e.g., Ticker("AAPL"))
+    * @param interval
+    *   The data interval (typically Interval.`1Day` for dividends)
+    * @param range
+    *   The time range to query (e.g., Range.`1Year`, Range.Max)
+    * @return
+    *   An optional list of dividend events, sorted chronologically
+    */
+  def getDividends(ticker: Ticker, interval: Interval, range: Range): F[Option[List[DividendEvent]]] =
+    gateway.getChart(ticker, interval, range).map(extractDividends)
+
+  /** Retrieves dividend history for a ticker within a custom date range.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param interval
+    *   The data interval
+    * @param since
+    *   Start of the date range (inclusive)
+    * @param until
+    *   End of the date range (inclusive)
+    * @return
+    *   An optional list of dividend events, sorted chronologically
+    */
+  def getDividends(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime
+  ): F[Option[List[DividendEvent]]] =
+    gateway.getChart(ticker, interval, since, until).map(extractDividends)
+
+  /** Retrieves stock split history for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param interval
+    *   The data interval (typically Interval.`1Day` for splits)
+    * @param range
+    *   The time range to query (e.g., Range.Max for all history)
+    * @return
+    *   An optional list of split events, sorted chronologically
+    */
+  def getSplits(ticker: Ticker, interval: Interval, range: Range): F[Option[List[SplitEvent]]] =
+    gateway.getChart(ticker, interval, range).map(extractSplits)
+
+  /** Retrieves stock split history for a ticker within a custom date range.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param interval
+    *   The data interval
+    * @param since
+    *   Start of the date range (inclusive)
+    * @param until
+    *   End of the date range (inclusive)
+    * @return
+    *   An optional list of split events, sorted chronologically
+    */
+  def getSplits(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime
+  ): F[Option[List[SplitEvent]]] =
+    gateway.getChart(ticker, interval, since, until).map(extractSplits)
+
+  /** Retrieves all corporate actions (dividends and splits) for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param interval
+    *   The data interval
+    * @param range
+    *   The time range to query
+    * @return
+    *   An optional CorporateActions object containing both dividends and splits
+    */
+  def getCorporateActions(ticker: Ticker, interval: Interval, range: Range): F[Option[CorporateActions]] =
+    gateway.getChart(ticker, interval, range).map(extractCorporateActions)
+
+  /** Retrieves all corporate actions for a ticker within a custom date range.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param interval
+    *   The data interval
+    * @param since
+    *   Start of the date range (inclusive)
+    * @param until
+    *   End of the date range (inclusive)
+    * @return
+    *   An optional CorporateActions object
+    */
+  def getCorporateActions(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime
+  ): F[Option[CorporateActions]] =
+    gateway.getChart(ticker, interval, since, until).map(extractCorporateActions)
+
   private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] = {
     result.chart.result.headOption.map { data =>
       val quotes = data.timestamp.indices.map { i =>
@@ -47,9 +156,42 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
         )
       }.toList
 
-      ChartResult(quotes)
+      val dividends = extractDividendsFromData(data)
+      val splits = extractSplitsFromData(data)
+
+      ChartResult(quotes, dividends, splits)
     }
   }
+
+  private def extractDividends(result: YFinanceQueryResult): Option[List[DividendEvent]] =
+    result.chart.result.headOption.map(extractDividendsFromData)
+
+  private def extractSplits(result: YFinanceQueryResult): Option[List[SplitEvent]] =
+    result.chart.result.headOption.map(extractSplitsFromData)
+
+  private def extractCorporateActions(result: YFinanceQueryResult): Option[CorporateActions] =
+    result.chart.result.headOption.map { data =>
+      CorporateActions(
+        dividends = extractDividendsFromData(data),
+        splits = extractSplitsFromData(data)
+      )
+    }
+
+  private def extractDividendsFromData(data: InstrumentData): List[DividendEvent] =
+    data.events
+      .flatMap(_.dividends)
+      .getOrElse(Map.empty)
+      .map { case (timestamp, raw) => DividendEvent.fromRaw(timestamp, raw) }
+      .toList
+      .sorted
+
+  private def extractSplitsFromData(data: InstrumentData): List[SplitEvent] =
+    data.events
+      .flatMap(_.splits)
+      .getOrElse(Map.empty)
+      .map { case (timestamp, raw) => SplitEvent.fromRaw(timestamp, raw) }
+      .toList
+      .sorted
 
   private def mapQuoteResult(result: YFinanceQuoteResult) = {
     result.summary.body.quoteSummary.result.headOption.map { quoteData =>

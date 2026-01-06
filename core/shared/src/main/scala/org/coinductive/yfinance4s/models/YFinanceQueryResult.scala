@@ -16,7 +16,11 @@ private[yfinance4s] object YFinanceQueryResult {
     implicit val decoder: Decoder[Chart] = deriveDecoder
   }
 
-  private[yfinance4s] final case class InstrumentData(timestamp: List[Long], indicators: Indicators)
+  private[yfinance4s] final case class InstrumentData(
+      timestamp: List[Long],
+      indicators: Indicators,
+      events: Option[Events]
+  )
 
   private[yfinance4s] object InstrumentData {
     implicit val decoder: Decoder[InstrumentData] = deriveDecoder
@@ -44,5 +48,35 @@ private[yfinance4s] object YFinanceQueryResult {
 
   private[yfinance4s] object AdjClose {
     implicit val decoder: Decoder[AdjClose] = deriveDecoder
+  }
+
+  // Event models for dividends and stock splits
+  private[yfinance4s] final case class Events(
+      dividends: Option[Map[String, DividendEventRaw]],
+      splits: Option[Map[String, SplitEventRaw]]
+  )
+
+  private[yfinance4s] object Events {
+    implicit val decoder: Decoder[Events] = deriveDecoder
+  }
+
+  private[yfinance4s] final case class DividendEventRaw(
+      amount: Double,
+      date: Long
+  )
+
+  private[yfinance4s] object DividendEventRaw {
+    implicit val decoder: Decoder[DividendEventRaw] = deriveDecoder
+  }
+
+  private[yfinance4s] final case class SplitEventRaw(
+      date: Long,
+      numerator: Int,
+      denominator: Int,
+      splitRatio: String
+  )
+
+  private[yfinance4s] object SplitEventRaw {
+    implicit val decoder: Decoder[SplitEventRaw] = deriveDecoder
   }
 }
