@@ -3,7 +3,7 @@ package org.coinductive.yfinance4s
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
 import io.circe.parser.decode
-import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceQueryResult}
+import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceOptionsResult, YFinanceQueryResult}
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
@@ -19,6 +19,10 @@ sealed trait YFinanceGateway[F[_]] {
       since: ZonedDateTime,
       until: ZonedDateTime
   ): F[YFinanceQueryResult]
+
+  def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
+
+  def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
 }
 
 private object YFinanceGateway {
@@ -44,17 +48,18 @@ private object YFinanceGateway {
   ) extends HTTPBase[F]
       with YFinanceGateway[F] {
 
-    private val ApiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
+    private val ChartApiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
+    private val OptionsApiEndpoint = uri"https://query1.finance.yahoo.com/v7/finance/options/"
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
         basicRequest.get(
-          ApiEndpoint
+          ChartApiEndpoint
             .addPath(ticker.show)
             .withParams(("interval", interval.show), ("range", range.show), ("events", "div,split"))
         )
 
-      sendRequest(req, parseContent)
+      sendRequest(req, parseChartContent)
     }
 
     def getChart(
@@ -65,7 +70,7 @@ private object YFinanceGateway {
     ): F[YFinanceQueryResult] = {
       val req =
         basicRequest.get(
-          ApiEndpoint
+          ChartApiEndpoint
             .addPath(ticker.show)
             .withParams(
               ("interval", interval.show),
@@ -75,13 +80,47 @@ private object YFinanceGateway {
             )
         )
 
-      sendRequest(req, parseContent)
+      sendRequest(req, parseChartContent)
     }
 
-    private def parseContent(content: String): F[YFinanceQueryResult] = {
+    def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
+      val req = basicRequest
+        .get(
+          OptionsApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("crumb", credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseOptionsContent)
+    }
+
+    def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
+      val req = basicRequest
+        .get(
+          OptionsApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("date", expiration.toString), ("crumb", credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseOptionsContent)
+    }
+
+    private def parseChartContent(content: String): F[YFinanceQueryResult] = {
       decode[YFinanceQueryResult](content)
         .fold(
-          e => F.raiseError(new Exception(s"Illegible response: ${e.getMessage}")),
+          e => F.raiseError(new Exception(s"Failed to parse chart response: ${e.getMessage}")),
+          F.pure
+        )
+    }
+
+    private def parseOptionsContent(content: String): F[YFinanceOptionsResult] = {
+      decode[YFinanceOptionsResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse options response: ${e.getMessage}")),
           F.pure
         )
     }

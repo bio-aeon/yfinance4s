@@ -1,25 +1,19 @@
 package org.coinductive.yfinance4s
 
-import cats.Functor
+import cats.Monad
 import cats.effect.{Async, Resource}
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import org.coinductive.yfinance4s.models.{
-  ChartResult,
-  CorporateActions,
-  DividendEvent,
-  Interval,
-  Range,
-  SplitEvent,
-  StockResult,
-  Ticker,
-  YFinanceQueryResult,
-  YFinanceQuoteResult
-}
+import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.YFinanceQueryResult.InstrumentData
 
-import java.time.{Instant, ZoneOffset, ZonedDateTime}
+import java.time.{Instant, LocalDate, ZoneOffset, ZonedDateTime}
 
-final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]) {
+final class YFinanceClient[F[_]: Monad] private (
+    gateway: YFinanceGateway[F],
+    scrapper: YFinanceScrapper[F],
+    auth: YFinanceAuth[F]
+) {
 
   def getChart(ticker: Ticker, interval: Interval, range: Range): F[Option[ChartResult]] =
     gateway.getChart(ticker, interval, range).map(mapQueryResult)
@@ -140,6 +134,47 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
   ): F[Option[CorporateActions]] =
     gateway.getChart(ticker, interval, since, until).map(extractCorporateActions)
 
+  /** Retrieves all available option expiration dates for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   List of available expiration dates, sorted chronologically
+    */
+  def getOptionExpirations(ticker: Ticker): F[Option[List[LocalDate]]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getOptions(ticker, credentials).map(extractExpirations)
+    }
+
+  /** Retrieves the option chain for a specific expiration date.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param expirationDate
+    *   The desired expiration date
+    * @return
+    *   The option chain for that expiration, or None if not available
+    */
+  def getOptionChain(ticker: Ticker, expirationDate: LocalDate): F[Option[OptionChain]] = {
+    val epochSeconds = expirationDate.atStartOfDay(ZoneOffset.UTC).toEpochSecond
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getOptions(ticker, epochSeconds, credentials).map(extractOptionChain(_, expirationDate))
+    }
+  }
+
+  /** Retrieves the nearest expiration's option chain along with all available expirations. This is more efficient than
+    * calling getOptionExpirations + getOptionChain separately.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   Full option chain data including all available expirations
+    */
+  def getFullOptionChain(ticker: Ticker): F[Option[FullOptionChain]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getOptions(ticker, credentials).map(mapToFullOptionChain)
+    }
+
   private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] = {
     result.chart.result.headOption.map { data =>
       val quotes = data.timestamp.indices.map { i =>
@@ -251,6 +286,77 @@ final class YFinanceClient[F[_]: Functor] private (gateway: YFinanceGateway[F], 
     }
   }
 
+  private def extractExpirations(result: YFinanceOptionsResult): Option[List[LocalDate]] =
+    result.optionChain.result.headOption.map { data =>
+      data.expirationDates.map(epochToLocalDate).sorted
+    }
+
+  private def extractOptionChain(result: YFinanceOptionsResult, requestedDate: LocalDate): Option[OptionChain] =
+    result.optionChain.result.headOption.flatMap { data =>
+      data.options
+        .find(container => epochToLocalDate(container.expirationDate) == requestedDate)
+        .map(container => buildOptionChain(container, data.strikes))
+    }
+
+  private def mapToFullOptionChain(result: YFinanceOptionsResult): Option[FullOptionChain] =
+    result.optionChain.result.headOption.map { data =>
+      val expirations = data.expirationDates.map(epochToLocalDate).sorted
+      val underlyingPrice = data.quote.flatMap(_.regularMarketPrice)
+
+      val chains = data.options.map { container =>
+        val date = epochToLocalDate(container.expirationDate)
+        date -> buildOptionChain(container, data.strikes)
+      }.toMap
+
+      FullOptionChain(
+        underlyingSymbol = data.underlyingSymbol,
+        underlyingPrice = underlyingPrice,
+        expirationDates = expirations,
+        chains = chains
+      )
+    }
+
+  private def buildOptionChain(container: OptionsContainerRaw, allStrikes: List[Double]): OptionChain = {
+    val expirationDate = epochToLocalDate(container.expirationDate)
+    val calls = container.calls.map(rawToContract(_, OptionType.Call, expirationDate)).sorted
+    val puts = container.puts.map(rawToContract(_, OptionType.Put, expirationDate)).sorted
+    val activeStrikes = (calls.map(_.strike) ++ puts.map(_.strike)).distinct.sorted
+
+    OptionChain(
+      expirationDate = expirationDate,
+      calls = calls,
+      puts = puts,
+      strikes = activeStrikes,
+      hasMiniOptions = container.hasMiniOptions
+    )
+  }
+
+  private def rawToContract(raw: OptionContractRaw, optionType: OptionType, expiration: LocalDate): OptionContract =
+    OptionContract(
+      contractSymbol = raw.contractSymbol,
+      optionType = optionType,
+      strike = raw.strike,
+      expiration = expiration,
+      currency = raw.currency,
+      lastPrice = raw.lastPrice,
+      change = raw.change,
+      percentChange = raw.percentChange,
+      bid = raw.bid,
+      ask = raw.ask,
+      volume = raw.volume,
+      openInterest = raw.openInterest,
+      impliedVolatility = raw.impliedVolatility.map(_ * 100.0),
+      inTheMoney = raw.inTheMoney,
+      lastTradeDate = raw.lastTradeDate.map(epochToZonedDateTime),
+      contractSize = raw.contractSize.map(ContractSize.fromString).getOrElse(ContractSize.Regular)
+    )
+
+  private def epochToLocalDate(epochSeconds: Long): LocalDate =
+    Instant.ofEpochSecond(epochSeconds).atZone(ZoneOffset.UTC).toLocalDate
+
+  private def epochToZonedDateTime(epochSeconds: Long): ZonedDateTime =
+    ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneOffset.UTC)
+
 }
 
 object YFinanceClient {
@@ -259,7 +365,8 @@ object YFinanceClient {
     for {
       gateway <- YFinanceGateway.resource[F](config.connectTimeout, config.readTimeout, config.retries)
       scrapper <- YFinanceScrapper.resource[F](config.connectTimeout, config.readTimeout, config.retries)
-    } yield new YFinanceClient(gateway, scrapper)
+      auth <- YFinanceAuth.resource[F](config.connectTimeout, config.readTimeout, config.retries)
+    } yield new YFinanceClient(gateway, scrapper, auth)
   }
 
 }
