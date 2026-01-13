@@ -3,7 +3,14 @@ package org.coinductive.yfinance4s
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
 import io.circe.parser.decode
-import org.coinductive.yfinance4s.models.{Interval, Range, Ticker, YFinanceOptionsResult, YFinanceQueryResult}
+import org.coinductive.yfinance4s.models.{
+  Interval,
+  Range,
+  Ticker,
+  YFinanceHoldersResult,
+  YFinanceOptionsResult,
+  YFinanceQueryResult
+}
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
@@ -23,6 +30,8 @@ sealed trait YFinanceGateway[F[_]] {
   def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
 
   def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
+
+  def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult]
 }
 
 private object YFinanceGateway {
@@ -50,6 +59,10 @@ private object YFinanceGateway {
 
     private val ChartApiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
     private val OptionsApiEndpoint = uri"https://query1.finance.yahoo.com/v7/finance/options/"
+    private val QuoteSummaryEndpoint = uri"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+
+    private val HoldersModules =
+      "majorHoldersBreakdown,institutionOwnership,fundOwnership,insiderTransactions,insiderHolders"
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
@@ -109,6 +122,23 @@ private object YFinanceGateway {
       sendRequest(req, parseOptionsContent)
     }
 
+    def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult] = {
+      val req = basicRequest
+        .get(
+          QuoteSummaryEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("modules", HoldersModules),
+              ("corsDomain", "finance.yahoo.com"),
+              ("crumb", credentials.crumb)
+            )
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseHoldersContent)
+    }
+
     private def parseChartContent(content: String): F[YFinanceQueryResult] = {
       decode[YFinanceQueryResult](content)
         .fold(
@@ -121,6 +151,14 @@ private object YFinanceGateway {
       decode[YFinanceOptionsResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse options response: ${e.getMessage}")),
+          F.pure
+        )
+    }
+
+    private def parseHoldersContent(content: String): F[YFinanceHoldersResult] = {
+      decode[YFinanceHoldersResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse holders response: ${e.getMessage}")),
           F.pure
         )
     }
