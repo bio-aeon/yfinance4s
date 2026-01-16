@@ -4,6 +4,7 @@ import cats.Monad
 import cats.effect.{Async, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import io.scalaland.chimney.dsl.*
 import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.YFinanceQueryResult.InstrumentData
 
@@ -246,6 +247,68 @@ final class YFinanceClient[F[_]: Monad] private (
     auth.getCredentials.flatMap { credentials =>
       gateway.getHolders(ticker, credentials).map(mapToHoldersData)
     }
+
+  // --- Financial Statements ---
+
+  /** Retrieves comprehensive financial statements for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param frequency
+    *   The reporting frequency (default: Yearly)
+    * @return
+    *   All financial statements (income, balance sheet, cash flow)
+    */
+  def getFinancialStatements(
+      ticker: Ticker,
+      frequency: Frequency = Frequency.Yearly
+  ): F[Option[FinancialStatements]] =
+    gateway.getFinancials(ticker, frequency).map(mapFinancialStatements(ticker, _))
+
+  /** Retrieves income statements for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param frequency
+    *   The reporting frequency (default: Yearly)
+    * @return
+    *   List of income statements sorted by date (most recent first)
+    */
+  def getIncomeStatements(
+      ticker: Ticker,
+      frequency: Frequency = Frequency.Yearly
+  ): F[List[IncomeStatement]] =
+    gateway.getFinancials(ticker, frequency, "income").map(extractIncomeStatements)
+
+  /** Retrieves balance sheets for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param frequency
+    *   The reporting frequency (default: Yearly)
+    * @return
+    *   List of balance sheets sorted by date (most recent first)
+    */
+  def getBalanceSheets(
+      ticker: Ticker,
+      frequency: Frequency = Frequency.Yearly
+  ): F[List[BalanceSheet]] =
+    gateway.getFinancials(ticker, frequency, "balance-sheet").map(extractBalanceSheets)
+
+  /** Retrieves cash flow statements for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @param frequency
+    *   The reporting frequency (default: Yearly)
+    * @return
+    *   List of cash flow statements sorted by date (most recent first)
+    */
+  def getCashFlowStatements(
+      ticker: Ticker,
+      frequency: Frequency = Frequency.Yearly
+  ): F[List[CashFlowStatement]] =
+    gateway.getFinancials(ticker, frequency, "cash-flow").map(extractCashFlowStatements)
 
   private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] = {
     result.chart.result.headOption.map { data =>
@@ -553,6 +616,74 @@ final class YFinanceClient[F[_]: Monad] private (
       positionIndirectDate = raw.positionIndirectDate.map(v => epochToLocalDate(v.raw)),
       url = raw.url.filter(_.nonEmpty)
     )
+
+  // --- Financial Statements Mapping ---
+
+  private val DefaultCurrency = "USD"
+
+  private def mapFinancialStatements(
+      ticker: Ticker,
+      result: YFinanceFinancialsResult
+  ): Option[FinancialStatements] = {
+    val byDate = result.byDate
+    if (byDate.isEmpty) return None
+
+    val currency = byDate.values.headOption.map(_.currencyCode).getOrElse(DefaultCurrency)
+
+    Some(
+      FinancialStatements(
+        ticker = ticker,
+        currency = currency,
+        incomeStatements = extractIncomeStatements(result),
+        balanceSheets = extractBalanceSheets(result),
+        cashFlowStatements = extractCashFlowStatements(result)
+      )
+    )
+  }
+
+  private def extractIncomeStatements(result: YFinanceFinancialsResult): List[IncomeStatement] =
+    result.byDate.toList.map { case (date, raw) =>
+      raw.income
+        .into[IncomeStatement]
+        .withFieldConst(_.reportDate, date)
+        .withFieldConst(_.periodType, raw.periodType)
+        .withFieldConst(_.currencyCode, raw.currencyCode)
+        .withFieldRenamed(_.depreciationAndAmortizationInIncomeStatement, _.depreciationAndAmortization)
+        .withFieldRenamed(_.basicEPS, _.basicEps)
+        .withFieldRenamed(_.dilutedEPS, _.dilutedEps)
+        .withFieldRenamed(_.eBIT, _.ebit)
+        .withFieldRenamed(_.eBITDA, _.ebitda)
+        .transform
+    }.sorted
+
+  private def extractBalanceSheets(result: YFinanceFinancialsResult): List[BalanceSheet] =
+    result.byDate.toList.map { case (date, raw) =>
+      raw.balance
+        .into[BalanceSheet]
+        .withFieldConst(_.reportDate, date)
+        .withFieldConst(_.periodType, raw.periodType)
+        .withFieldConst(_.currencyCode, raw.currencyCode)
+        .withFieldRenamed(_.otherShortTermInvestments, _.shortTermInvestments)
+        .withFieldRenamed(_.netPPE, _.netPpe)
+        .withFieldRenamed(_.grossPPE, _.grossPpe)
+        .withFieldRenamed(_.longTermEquityInvestment, _.longTermInvestments)
+        .withFieldRenamed(_.totalNonCurrentLiabilitiesNetMinorityInterest, _.totalNonCurrentLiabilities)
+        .withFieldRenamed(_.totalLiabilitiesNetMinorityInterest, _.totalLiabilities)
+        .withFieldRenamed(_.shareIssued, _.sharesIssued)
+        .transform
+    }.sorted
+
+  private def extractCashFlowStatements(result: YFinanceFinancialsResult): List[CashFlowStatement] =
+    result.byDate.toList.map { case (date, raw) =>
+      raw.cashFlow
+        .into[CashFlowStatement]
+        .withFieldConst(_.reportDate, date)
+        .withFieldConst(_.periodType, raw.periodType)
+        .withFieldConst(_.currencyCode, raw.currencyCode)
+        .withFieldRenamed(_.changeInPayable, _.changeInPayables)
+        .withFieldRenamed(_.netPPEPurchaseAndSale, _.netPpePurchaseAndSale)
+        .transform
+    }.sorted
 
 }
 
