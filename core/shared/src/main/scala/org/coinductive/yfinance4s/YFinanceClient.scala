@@ -175,6 +175,78 @@ final class YFinanceClient[F[_]: Monad] private (
       gateway.getOptions(ticker, credentials).map(mapToFullOptionChain)
     }
 
+  /** Retrieves major holders breakdown for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   Breakdown of insider vs institutional ownership percentages
+    */
+  def getMajorHolders(ticker: Ticker): F[Option[MajorHolders]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(extractMajorHolders)
+    }
+
+  /** Retrieves top institutional holders for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   List of top institutional holders, sorted by percentage held (descending)
+    */
+  def getInstitutionalHolders(ticker: Ticker): F[List[InstitutionalHolder]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(extractInstitutionalHolders)
+    }
+
+  /** Retrieves top mutual fund holders for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   List of top mutual fund holders, sorted by percentage held (descending)
+    */
+  def getMutualFundHolders(ticker: Ticker): F[List[MutualFundHolder]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(extractMutualFundHolders)
+    }
+
+  /** Retrieves recent insider transactions for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   List of insider transactions, sorted by date (most recent first)
+    */
+  def getInsiderTransactions(ticker: Ticker): F[List[InsiderTransaction]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(extractInsiderTransactions)
+    }
+
+  /** Retrieves insider roster (current positions) for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   List of insider roster entries, sorted by position size (descending)
+    */
+  def getInsiderRoster(ticker: Ticker): F[List[InsiderRosterEntry]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(extractInsiderRoster)
+    }
+
+  /** Retrieves comprehensive holders data for a ticker.
+    *
+    * @param ticker
+    *   The stock ticker symbol
+    * @return
+    *   Complete holders data including major holders, institutional/fund holders, and insider information
+    */
+  def getHoldersData(ticker: Ticker): F[Option[HoldersData]] =
+    auth.getCredentials.flatMap { credentials =>
+      gateway.getHolders(ticker, credentials).map(mapToHoldersData)
+    }
+
   private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] = {
     result.chart.result.headOption.map { data =>
       val quotes = data.timestamp.indices.map { i =>
@@ -356,6 +428,131 @@ final class YFinanceClient[F[_]: Monad] private (
 
   private def epochToZonedDateTime(epochSeconds: Long): ZonedDateTime =
     ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneOffset.UTC)
+
+  // --- Holders Data Mapping ---
+
+  private def extractMajorHolders(result: YFinanceHoldersResult): Option[MajorHolders] =
+    result.quoteSummary.result.headOption.flatMap { data =>
+      data.majorHoldersBreakdown.flatMap(mapMajorHolders)
+    }
+
+  private def extractInstitutionalHolders(result: YFinanceHoldersResult): List[InstitutionalHolder] =
+    result.quoteSummary.result.headOption
+      .flatMap(_.institutionOwnership)
+      .flatMap(_.ownershipList)
+      .getOrElse(List.empty)
+      .flatMap(mapInstitutionalHolder)
+      .sorted
+
+  private def extractMutualFundHolders(result: YFinanceHoldersResult): List[MutualFundHolder] =
+    result.quoteSummary.result.headOption
+      .flatMap(_.fundOwnership)
+      .flatMap(_.ownershipList)
+      .getOrElse(List.empty)
+      .flatMap(mapMutualFundHolder)
+      .sorted
+
+  private def extractInsiderTransactions(result: YFinanceHoldersResult): List[InsiderTransaction] =
+    result.quoteSummary.result.headOption
+      .flatMap(_.insiderTransactions)
+      .flatMap(_.transactions)
+      .getOrElse(List.empty)
+      .flatMap(mapInsiderTransaction)
+      .sorted
+
+  private def extractInsiderRoster(result: YFinanceHoldersResult): List[InsiderRosterEntry] =
+    result.quoteSummary.result.headOption
+      .flatMap(_.insiderHolders)
+      .flatMap(_.holders)
+      .getOrElse(List.empty)
+      .flatMap(mapInsiderRosterEntry)
+      .sorted
+
+  private def mapToHoldersData(result: YFinanceHoldersResult): Option[HoldersData] =
+    result.quoteSummary.result.headOption.map { data =>
+      HoldersData(
+        majorHolders = data.majorHoldersBreakdown.flatMap(mapMajorHolders),
+        institutionalHolders = data.institutionOwnership
+          .flatMap(_.ownershipList)
+          .getOrElse(List.empty)
+          .flatMap(mapInstitutionalHolder)
+          .sorted,
+        mutualFundHolders = data.fundOwnership
+          .flatMap(_.ownershipList)
+          .getOrElse(List.empty)
+          .flatMap(mapMutualFundHolder)
+          .sorted,
+        insiderTransactions = data.insiderTransactions
+          .flatMap(_.transactions)
+          .getOrElse(List.empty)
+          .flatMap(mapInsiderTransaction)
+          .sorted,
+        insiderRoster = data.insiderHolders
+          .flatMap(_.holders)
+          .getOrElse(List.empty)
+          .flatMap(mapInsiderRosterEntry)
+          .sorted
+      )
+    }
+
+  private def mapMajorHolders(raw: MajorHoldersBreakdownRaw): Option[MajorHolders] =
+    for {
+      insiders <- raw.insidersPercentHeld.map(_.raw)
+      institutions <- raw.institutionsPercentHeld.map(_.raw)
+      institutionsFloat <- raw.institutionsFloatPercentHeld.map(_.raw)
+      institutionsCount <- raw.institutionsCount.map(_.raw)
+    } yield MajorHolders(insiders, institutions, institutionsFloat, institutionsCount)
+
+  private def mapInstitutionalHolder(raw: OwnershipEntryRaw): Option[InstitutionalHolder] =
+    for {
+      org <- raw.organization
+      reportDate <- raw.reportDate.map(v => epochToLocalDate(v.raw))
+      pctHeld <- raw.pctHeld.map(_.raw)
+      position <- raw.position.map(_.raw)
+      value <- raw.value.map(_.raw)
+    } yield InstitutionalHolder(org, reportDate, pctHeld, position, value)
+
+  private def mapMutualFundHolder(raw: OwnershipEntryRaw): Option[MutualFundHolder] =
+    for {
+      org <- raw.organization
+      reportDate <- raw.reportDate.map(v => epochToLocalDate(v.raw))
+      pctHeld <- raw.pctHeld.map(_.raw)
+      position <- raw.position.map(_.raw)
+      value <- raw.value.map(_.raw)
+    } yield MutualFundHolder(org, reportDate, pctHeld, position, value)
+
+  private def mapInsiderTransaction(raw: InsiderTransactionRaw): Option[InsiderTransaction] =
+    for {
+      filerName <- raw.filerName
+      filerRelation <- raw.filerRelation
+      transactionDate <- raw.startDate.map(v => epochToLocalDate(v.raw))
+      shares <- raw.shares.map(_.raw)
+    } yield InsiderTransaction(
+      filerName = filerName,
+      filerRelation = filerRelation,
+      transactionDate = transactionDate,
+      shares = shares,
+      value = raw.value.map(_.raw),
+      transactionText = raw.transactionText.getOrElse(""),
+      ownershipType = raw.ownership.map(OwnershipType.fromString).getOrElse(OwnershipType.Direct),
+      filerUrl = raw.filerUrl.filter(_.nonEmpty)
+    )
+
+  private def mapInsiderRosterEntry(raw: InsiderHolderRaw): Option[InsiderRosterEntry] =
+    for {
+      name <- raw.name
+      relation <- raw.relation
+    } yield InsiderRosterEntry(
+      name = name,
+      relation = relation,
+      latestTransactionDate = raw.latestTransDate.map(v => epochToLocalDate(v.raw)),
+      latestTransactionType = raw.transactionDescription,
+      positionDirect = raw.positionDirect.map(_.raw),
+      positionDirectDate = raw.positionDirectDate.map(v => epochToLocalDate(v.raw)),
+      positionIndirect = raw.positionIndirect.map(_.raw),
+      positionIndirectDate = raw.positionIndirectDate.map(v => epochToLocalDate(v.raw)),
+      url = raw.url.filter(_.nonEmpty)
+    )
 
 }
 
