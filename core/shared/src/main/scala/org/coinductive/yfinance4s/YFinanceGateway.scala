@@ -3,18 +3,11 @@ package org.coinductive.yfinance4s
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
 import io.circe.parser.decode
-import org.coinductive.yfinance4s.models.{
-  Interval,
-  Range,
-  Ticker,
-  YFinanceHoldersResult,
-  YFinanceOptionsResult,
-  YFinanceQueryResult
-}
+import org.coinductive.yfinance4s.models.*
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 
-import java.time.ZonedDateTime
+import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.FiniteDuration
 
 sealed trait YFinanceGateway[F[_]] {
@@ -32,6 +25,8 @@ sealed trait YFinanceGateway[F[_]] {
   def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
 
   def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult]
+
+  def getFinancials(ticker: Ticker, frequency: Frequency, statementType: String = "all"): F[YFinanceFinancialsResult]
 }
 
 private object YFinanceGateway {
@@ -63,6 +58,9 @@ private object YFinanceGateway {
 
     private val HoldersModules =
       "majorHoldersBreakdown,institutionOwnership,fundOwnership,insiderTransactions,insiderHolders"
+
+    private val FinancialsEndpoint =
+      uri"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
@@ -162,6 +160,43 @@ private object YFinanceGateway {
           F.pure
         )
     }
+
+    def getFinancials(
+        ticker: Ticker,
+        frequency: Frequency,
+        statementType: String
+    ): F[YFinanceFinancialsResult] = {
+      val keys = statementType match {
+        case "income"        => IncomeStatement.apiKeys
+        case "balance-sheet" => BalanceSheet.apiKeys
+        case "cash-flow"     => CashFlowStatement.apiKeys
+        case _               => IncomeStatement.apiKeys ++ BalanceSheet.apiKeys ++ CashFlowStatement.apiKeys
+      }
+
+      val typeParam = keys.map(k => s"${frequency.apiValue}$k").mkString(",")
+      val now = ZonedDateTime.now(ZoneOffset.UTC)
+      val startDate = now.minusYears(10)
+
+      val req = basicRequest.get(
+        FinancialsEndpoint
+          .addPath(ticker.show)
+          .withParams(
+            ("symbol", ticker.show),
+            ("type", typeParam),
+            ("period1", startDate.toEpochSecond.toString),
+            ("period2", now.toEpochSecond.toString)
+          )
+      )
+
+      sendRequest(req, parseFinancialsContent)
+    }
+
+    private def parseFinancialsContent(content: String): F[YFinanceFinancialsResult] =
+      decode[YFinanceFinancialsResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse financials response: ${e.getMessage}")),
+          F.pure
+        )
 
   }
 
