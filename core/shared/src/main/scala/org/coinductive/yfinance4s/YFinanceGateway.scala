@@ -27,6 +27,8 @@ sealed trait YFinanceGateway[F[_]] {
   def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult]
 
   def getFinancials(ticker: Ticker, frequency: Frequency, statementType: String = "all"): F[YFinanceFinancialsResult]
+
+  def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult]
 }
 
 private object YFinanceGateway {
@@ -58,6 +60,9 @@ private object YFinanceGateway {
 
     private val HoldersModules =
       "majorHoldersBreakdown,institutionOwnership,fundOwnership,insiderTransactions,insiderHolders"
+
+    private val AnalystModules =
+      "financialData,recommendationTrend,upgradeDowngradeHistory,earningsTrend,earningsHistory,indexTrend"
 
     private val FinancialsEndpoint =
       uri"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
@@ -195,6 +200,30 @@ private object YFinanceGateway {
       decode[YFinanceFinancialsResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse financials response: ${e.getMessage}")),
+          F.pure
+        )
+
+    def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult] = {
+      val req = basicRequest
+        .get(
+          QuoteSummaryEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("modules", AnalystModules),
+              ("corsDomain", "finance.yahoo.com"),
+              ("crumb", credentials.crumb)
+            )
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAnalystContent)
+    }
+
+    private def parseAnalystContent(content: String): F[YFinanceAnalystResult] =
+      decode[YFinanceAnalystResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse analyst response: ${e.getMessage}")),
           F.pure
         )
 
