@@ -1,7 +1,9 @@
 package org.coinductive.yfinance4s
 
 import cats.Monad
-import cats.effect.{Async, Resource}
+import cats.data.NonEmptyList
+import cats.effect.{Async, Concurrent, Resource}
+import cats.effect.syntax.concurrent.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import io.scalaland.chimney.dsl.*
@@ -348,6 +350,128 @@ final class YFinanceClient[F[_]: Monad] private (
   /** Retrieves comprehensive analyst data for a ticker. */
   def getAnalystData(ticker: Ticker): F[Option[AnalystData]] =
     fetchAnalystData(ticker)(mapToAnalystData)
+
+  // --- Multi-Ticker Downloads ---
+
+  /** Downloads chart data for multiple tickers in parallel. Fails if any ticker fetch fails.
+    *
+    * @param tickers
+    *   Non-empty list of ticker symbols to fetch
+    * @param interval
+    *   The data interval (e.g., Interval.`1Day`)
+    * @param range
+    *   The time range to query (e.g., Range.`1Month`)
+    * @param parallelism
+    *   Maximum number of concurrent requests (default: 4)
+    * @return
+    *   Map from each ticker to its chart result
+    */
+  def downloadCharts(
+      tickers: NonEmptyList[Ticker],
+      interval: Interval,
+      range: Range,
+      parallelism: Int = YFinanceClient.DefaultParallelism
+  )(implicit C: Concurrent[F]): F[Map[Ticker, ChartResult]] =
+    downloadMulti(tickers, parallelism) { ticker =>
+      getChart(ticker, interval, range).flatMap {
+        case Some(result) => Monad[F].pure(result)
+        case None =>
+          C.raiseError[ChartResult](
+            new NoSuchElementException(s"No chart data for ${ticker.value}")
+          )
+      }
+    }
+
+  /** Downloads chart data for multiple tickers in parallel within a date range. Fails if any ticker fetch fails.
+    *
+    * @param tickers
+    *   Non-empty list of ticker symbols to fetch
+    * @param interval
+    *   The data interval
+    * @param since
+    *   Start of the date range (inclusive)
+    * @param until
+    *   End of the date range (inclusive)
+    * @param parallelism
+    *   Maximum number of concurrent requests (default: 4)
+    * @return
+    *   Map from each ticker to its chart result
+    */
+  def downloadCharts(
+      tickers: NonEmptyList[Ticker],
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime,
+      parallelism: Int
+  )(implicit C: Concurrent[F]): F[Map[Ticker, ChartResult]] =
+    downloadMulti(tickers, parallelism) { ticker =>
+      getChart(ticker, interval, since, until).flatMap {
+        case Some(result) => Monad[F].pure(result)
+        case None =>
+          C.raiseError[ChartResult](
+            new NoSuchElementException(s"No chart data for ${ticker.value}")
+          )
+      }
+    }
+
+  /** Downloads current stock quotes for multiple tickers in parallel. Fails if any ticker fetch fails.
+    *
+    * @param tickers
+    *   Non-empty list of ticker symbols to fetch
+    * @param parallelism
+    *   Maximum number of concurrent requests (default: 4)
+    * @return
+    *   Map from each ticker to its stock result
+    */
+  def downloadStocks(
+      tickers: NonEmptyList[Ticker],
+      parallelism: Int = YFinanceClient.DefaultParallelism
+  )(implicit C: Concurrent[F]): F[Map[Ticker, StockResult]] =
+    downloadMulti(tickers, parallelism) { ticker =>
+      getStock(ticker).flatMap {
+        case Some(result) => Monad[F].pure(result)
+        case None =>
+          C.raiseError[StockResult](
+            new NoSuchElementException(s"No stock data for ${ticker.value}")
+          )
+      }
+    }
+
+  /** Downloads financial statements for multiple tickers in parallel. Fails if any ticker fetch fails.
+    *
+    * @param tickers
+    *   Non-empty list of ticker symbols to fetch
+    * @param frequency
+    *   The reporting frequency (default: Yearly)
+    * @param parallelism
+    *   Maximum number of concurrent requests (default: 4)
+    * @return
+    *   Map from each ticker to its financial statements
+    */
+  def downloadFinancialStatements(
+      tickers: NonEmptyList[Ticker],
+      frequency: Frequency = Frequency.Yearly,
+      parallelism: Int = YFinanceClient.DefaultParallelism
+  )(implicit C: Concurrent[F]): F[Map[Ticker, FinancialStatements]] =
+    downloadMulti(tickers, parallelism) { ticker =>
+      getFinancialStatements(ticker, frequency).flatMap {
+        case Some(result) => Monad[F].pure(result)
+        case None =>
+          C.raiseError[FinancialStatements](
+            new NoSuchElementException(s"No financial data for ${ticker.value}")
+          )
+      }
+    }
+
+  private def downloadMulti[A](
+      tickers: NonEmptyList[Ticker],
+      parallelism: Int
+  )(fetch: Ticker => F[A])(implicit C: Concurrent[F]): F[Map[Ticker, A]] =
+    tickers.toList
+      .parTraverseN(parallelism) { ticker =>
+        fetch(ticker).map(ticker -> _)
+      }
+      .map(_.toMap)
 
   private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] = {
     result.chart.result.headOption.map { data =>
@@ -922,6 +1046,8 @@ final class YFinanceClient[F[_]: Monad] private (
 }
 
 object YFinanceClient {
+
+  private val DefaultParallelism = 4
 
   def resource[F[_]: Async](config: YFinanceClientConfig): Resource[F, YFinanceClient[F]] = {
     for {
