@@ -10,6 +10,8 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Stock Fundamentals**: Retrieve comprehensive company data including financials, valuation ratios, and key statistics
 - **Holders Data**: Get institutional ownership, mutual fund holdings, and insider transactions
 - **Financial Statements**: Fetch income statements, balance sheets, and cash flow statements (annual, quarterly, or trailing)
+- **Analyst Data**: Access price targets, buy/hold/sell recommendations, earnings estimates, upgrade/downgrade history, and growth comparisons
+- **Batch Operations**: Fetch data for multiple tickers in parallel with configurable concurrency and error-tolerant modes via the `Tickers` wrapper
 - **Purely Functional**: Built on Cats Effect 3 with `Resource`-based lifecycle management
 - **Cross-Platform**: Supports both JVM and Scala.js
 - **Scala 2.13 & Scala 3**: Compatible with Scala 2.13 and Scala 3
@@ -285,6 +287,152 @@ clientResource.use { client =>
 }
 ```
 
+### Fetching Analyst Data
+
+```scala
+clientResource.use { client =>
+  // Get analyst consensus price targets
+  client.getAnalystPriceTargets(Ticker("AAPL")).map {
+    case Some(targets) =>
+      println(s"Current Price: ${targets.currentPrice}")
+      println(s"Target Range: ${targets.targetLow} - ${targets.targetHigh}")
+      println(s"Mean Target: ${targets.targetMean} (${targets.numberOfAnalysts} analysts)")
+      println(s"Recommendation: ${targets.recommendationKey}")
+      println(f"Upside: ${targets.meanUpsidePercent}%.1f%%")
+    case None =>
+      println("No price targets available")
+  }
+}
+
+clientResource.use { client =>
+  // Get buy/hold/sell recommendation trends
+  client.getRecommendations(Ticker("MSFT")).flatMap { trends =>
+    trends.headOption.traverse_ { rec =>
+      IO.println(s"Period: ${rec.period}") *>
+      IO.println(s"Strong Buy: ${rec.strongBuy}, Buy: ${rec.buy}, Hold: ${rec.hold}") *>
+      IO.println(s"Sell: ${rec.sell}, Strong Sell: ${rec.strongSell}") *>
+      IO.println(f"Bullish: ${rec.bullishPercent}%.1f%%")
+    }
+  }
+}
+
+clientResource.use { client =>
+  // Get recent upgrade/downgrade history
+  client.getUpgradeDowngradeHistory(Ticker("GOOGL")).flatMap { history =>
+    history.take(5).traverse_ { ud =>
+      val action = if (ud.isUpgrade) "upgraded" else if (ud.isDowngrade) "downgraded" else "rated"
+      IO.println(s"${ud.date}: ${ud.firm} $action to ${ud.toGrade}")
+    }
+  }
+}
+
+clientResource.use { client =>
+  // Get earnings estimates and history
+  client.getEarningsEstimates(Ticker("NVDA")).flatMap { estimates =>
+    estimates.headOption.traverse_ { est =>
+      IO.println(s"Period: ${est.period}") *>
+      IO.println(s"Average EPS Estimate: ${est.avg}") *>
+      IO.println(s"Range: ${est.low} - ${est.high}")
+    }
+  }
+}
+
+clientResource.use { client =>
+  // Get comprehensive analyst data (all analyst info in one call)
+  client.getAnalystData(Ticker("AAPL")).map {
+    case Some(data) =>
+      data.priceTargets.foreach(t => println(s"Mean Target: ${t.targetMean}"))
+      data.currentRecommendation.foreach(r => println(s"Current: ${r.totalBullish} bullish, ${r.totalBearish} bearish"))
+      println(s"Consecutive Beats: ${data.consecutiveBeats}")
+      data.earningsBeatRate.foreach(rate => println(f"Beat Rate: $rate%.0f%%"))
+    case None =>
+      println("No analyst data")
+  }
+}
+```
+
+### Batch Operations with Tickers
+
+The `Tickers` wrapper provides a fluent API for fetching data across multiple tickers in parallel.
+
+```scala
+import cats.data.NonEmptyList
+
+clientResource.use { client =>
+  // Create a Tickers instance from string symbols
+  val tickers = Tickers.of[IO](client, "AAPL", "MSFT", "GOOGL")
+
+  // Fetch historical data for all tickers (fail-fast: raises on first failure)
+  tickers.history(Interval.`1Day`, Range.`1Month`).map { results =>
+    results.foreach { case (ticker, chart) =>
+      println(s"${ticker.value}: ${chart.quotes.size} data points")
+    }
+  }
+}
+
+clientResource.use { client =>
+  // Error-tolerant mode: collect successes and failures separately
+  val tickers = Tickers.of[IO](client, "AAPL", "INVALIDTICKER")
+
+  tickers.attemptHistory(Interval.`1Day`, Range.`1Month`).map { results =>
+    results.foreach {
+      case (ticker, Right(chart)) => println(s"${ticker.value}: ${chart.quotes.size} quotes")
+      case (ticker, Left(err))    => println(s"${ticker.value}: failed - ${err.getMessage}")
+    }
+  }
+}
+
+clientResource.use { client =>
+  // Configure parallelism and build up the ticker list
+  val tickers = Tickers
+    .single[IO](client, Ticker("AAPL"))
+    .add(Ticker("MSFT"))
+    .add(Ticker("GOOGL"))
+    .withParallelism(2)
+
+  // All data methods are available: info, financials, dividends, splits,
+  // corporateActions, holdersData, analystData, optionExpirations
+  for {
+    quotes     <- tickers.info
+    financials <- tickers.financials()
+    analyst    <- tickers.analystData
+  } yield {
+    quotes.foreach { case (t, stock) => println(s"${t.value}: ${stock.regularMarketPrice}") }
+  }
+}
+```
+
+### Multi-Ticker Downloads
+
+The client also provides lower-level `download*` methods for batch operations using `NonEmptyList`:
+
+```scala
+import cats.data.NonEmptyList
+
+clientResource.use { client =>
+  val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"), Ticker("GOOGL"))
+
+  // Download charts for multiple tickers with configurable parallelism
+  client.downloadCharts(tickers, Interval.`1Day`, Range.`1Month`, parallelism = 4).map { results =>
+    results.foreach { case (ticker, chart) =>
+      println(s"${ticker.value}: ${chart.quotes.size} data points")
+    }
+  }
+}
+
+clientResource.use { client =>
+  val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"))
+
+  // Download stock quotes and financial statements in parallel
+  for {
+    stocks     <- client.downloadStocks(tickers)
+    financials <- client.downloadFinancialStatements(tickers, Frequency.Yearly)
+  } yield {
+    stocks.foreach { case (t, s) => println(s"${t.value}: ${s.regularMarketPrice}") }
+  }
+}
+```
+
 ## Available Intervals
 
 | Interval | Value |
@@ -441,6 +589,75 @@ Cash flow data including:
 - Investing: `investingCashFlow`, `capitalExpenditure`
 - Financing: `financingCashFlow`, `dividendsPaid`
 - `freeCashFlow`: Operating cash flow minus capex
+
+### CorporateActions
+
+Combined dividends and splits:
+- `dividends`: List of dividend events
+- `splits`: List of split events
+- `totalDividendAmount`: Sum of all dividend amounts
+- `cumulativeSplitFactor`: Product of all split factors
+- `isEmpty`, `nonEmpty`: Convenience checks
+
+### AnalystData
+
+Comprehensive analyst data for a security:
+- `priceTargets`: Consensus price targets and recommendation
+- `recommendations`: Buy/hold/sell trends by period
+- `upgradeDowngradeHistory`: Historical rating changes
+- `earningsEstimates`: EPS forecasts by period
+- `revenueEstimates`: Revenue forecasts by period
+- `epsTrends`: EPS consensus trend over time
+- `epsRevisions`: EPS revision counts
+- `earningsHistory`: Historical actual vs. estimate
+- `growthEstimates`: Growth estimates with index comparison
+- Analytics: `currentRecommendation`, `consecutiveBeats`, `earningsBeatRate`, `recentUpgrades`, `recentDowngrades`
+
+### AnalystPriceTargets
+
+Analyst consensus price targets:
+- `currentPrice`, `targetHigh`, `targetLow`, `targetMean`, `targetMedian`
+- `numberOfAnalysts`: Number of analysts providing targets
+- `recommendationKey`: Consensus recommendation (e.g., "buy", "hold", "sell")
+- `recommendationMean`: Consensus on a 1-5 scale (1 = Strong Buy, 5 = Strong Sell)
+- Calculations: `meanUpsidePercent`, `medianUpsidePercent`, `targetRange`, `isBelowAllTargets`, `isAboveAllTargets`
+
+### RecommendationTrend
+
+Analyst recommendation summary for a period:
+- `period`: Time period (e.g., "0m" for current month, "-1m" for last month)
+- `strongBuy`, `buy`, `hold`, `sell`, `strongSell`: Counts per category
+- Calculations: `totalAnalysts`, `totalBullish`, `totalBearish`, `bullishPercent`, `bearishPercent`, `netSentiment`, `isBullish`
+
+### UpgradeDowngrade
+
+Individual analyst rating change:
+- `date`, `firm`, `toGrade`, `fromGrade`, `action`
+- `isUpgrade`, `isDowngrade`, `isInitiation`, `isMaintained`
+
+### EarningsEstimate
+
+Analyst EPS forecast for a period:
+- `period`, `endDate`, `avg`, `low`, `high`, `yearAgoEps`, `numberOfAnalysts`, `growth`
+- Calculations: `estimateRange`, `estimateSpreadPercent`, `isQuarterly`, `isYearly`
+
+### RevenueEstimate
+
+Analyst revenue forecast for a period:
+- `period`, `endDate`, `avg`, `low`, `high`, `yearAgoRevenue`, `numberOfAnalysts`, `growth`
+- Calculations: `estimateRange`, `estimateSpreadPercent`, `isQuarterly`, `isYearly`
+
+### EarningsHistory
+
+Historical earnings actual vs. estimate:
+- `quarter`, `period`, `epsActual`, `epsEstimate`, `epsDifference`, `surprisePercent`
+- `isBeat`, `isMiss`, `isMet`
+
+### GrowthEstimates
+
+Growth estimates with index comparison:
+- `period`, `stockGrowth`, `indexGrowth`, `indexSymbol`
+- `isOutperforming`, `growthDifferential`
 
 ## License
 
