@@ -5,7 +5,7 @@ import org.coinductive.yfinance4s.models.MajorHolders
 
 class MajorHoldersSpec extends FunSuite {
 
-  test("retailPercentHeld should calculate remaining percentage") {
+  test("calculates retail percent as remainder of insider and institutional") {
     val holders = MajorHolders(
       insidersPercentHeld = 0.05,
       institutionsPercentHeld = 0.60,
@@ -17,7 +17,7 @@ class MajorHoldersSpec extends FunSuite {
     assert(Math.abs(holders.retailPercentHeld - 0.35) < 0.001)
   }
 
-  test("isInstitutionallyDominated should return true when institutions hold >50%") {
+  test("is institutionally dominated when institutions hold >50%") {
     val dominated = MajorHolders(0.01, 0.60, 0.62, 1000)
     val notDominated = MajorHolders(0.01, 0.40, 0.42, 500)
 
@@ -25,7 +25,7 @@ class MajorHoldersSpec extends FunSuite {
     assert(!notDominated.isInstitutionallyDominated)
   }
 
-  test("hasSignificantInsiderOwnership should return true when insiders hold >5%") {
+  test("has significant insider ownership when insiders hold >5%") {
     val significant = MajorHolders(0.10, 0.50, 0.52, 1000)
     val notSignificant = MajorHolders(0.02, 0.60, 0.62, 1000)
 
@@ -33,14 +33,14 @@ class MajorHoldersSpec extends FunSuite {
     assert(!notSignificant.hasSignificantInsiderOwnership)
   }
 
-  test("retailPercentHeld should not be negative") {
+  test("retail percent floors at zero when percentages exceed 100%") {
     // Edge case: percentages exceed 100% (can happen with rounding)
     val holders = MajorHolders(0.50, 0.60, 0.62, 1000)
 
     assertEquals(holders.retailPercentHeld, 0.0)
   }
 
-  test("isInstitutionallyDominated boundary at exactly 50%") {
+  test("institutional domination boundary is exclusive at 50%") {
     val atBoundary = MajorHolders(0.01, 0.50, 0.52, 500)
     val justAbove = MajorHolders(0.01, 0.501, 0.52, 500)
 
@@ -48,7 +48,7 @@ class MajorHoldersSpec extends FunSuite {
     assert(justAbove.isInstitutionallyDominated)
   }
 
-  test("hasSignificantInsiderOwnership boundary at exactly 5%") {
+  test("significant insider ownership boundary is exclusive at 5%") {
     val atBoundary = MajorHolders(0.05, 0.50, 0.52, 1000)
     val justAbove = MajorHolders(0.051, 0.50, 0.52, 1000)
 

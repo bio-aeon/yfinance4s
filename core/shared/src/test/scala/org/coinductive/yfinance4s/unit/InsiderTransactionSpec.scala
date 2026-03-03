@@ -7,7 +7,7 @@ import java.time.LocalDate
 
 class InsiderTransactionSpec extends FunSuite {
 
-  test("isPurchase should return true for positive shares") {
+  test("identifies purchase when shares are positive") {
     val purchase = InsiderTransaction(
       filerName = "John Doe",
       filerRelation = "CEO",
@@ -23,7 +23,7 @@ class InsiderTransactionSpec extends FunSuite {
     assert(!purchase.isSale)
   }
 
-  test("isSale should return true for negative shares") {
+  test("identifies sale when shares are negative") {
     val sale = InsiderTransaction(
       filerName = "Jane Smith",
       filerRelation = "CFO",
@@ -39,7 +39,7 @@ class InsiderTransactionSpec extends FunSuite {
     assert(!sale.isPurchase)
   }
 
-  test("sharesTraded should return absolute value") {
+  test("reports absolute shares traded") {
     val sale = InsiderTransaction(
       filerName = "Test",
       filerRelation = "Director",
@@ -54,7 +54,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(sale.sharesTraded, 5000L)
   }
 
-  test("pricePerShare should calculate from value and shares") {
+  test("calculates price per share from value and shares") {
     val transaction = InsiderTransaction(
       filerName = "Test",
       filerRelation = "CEO",
@@ -69,7 +69,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(transaction.pricePerShare, Some(150.0))
   }
 
-  test("pricePerShare should return None when value is None") {
+  test("returns no price per share when value is absent") {
     val transaction = InsiderTransaction(
       filerName = "Test",
       filerRelation = "CEO",
@@ -84,7 +84,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(transaction.pricePerShare, None)
   }
 
-  test("pricePerShare should return None when value is zero") {
+  test("returns no price per share when value is zero") {
     val transaction = InsiderTransaction(
       filerName = "Test",
       filerRelation = "CEO",
@@ -99,7 +99,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(transaction.pricePerShare, None)
   }
 
-  test("ordering should sort by date descending (most recent first)") {
+  test("sorts by transaction date descending") {
     val t1 = InsiderTransaction("A", "CEO", LocalDate.of(2024, 1, 1), 100, None, "", OwnershipType.Direct, None)
     val t2 = InsiderTransaction("B", "CFO", LocalDate.of(2024, 3, 1), 200, None, "", OwnershipType.Direct, None)
     val t3 = InsiderTransaction("C", "COO", LocalDate.of(2024, 2, 1), 150, None, "", OwnershipType.Direct, None)
@@ -109,7 +109,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(sorted.map(_.filerName), List("B", "C", "A"))
   }
 
-  test("OwnershipType.fromString should parse correctly") {
+  test("parses ownership type from string") {
     assertEquals(OwnershipType.fromString("D"), OwnershipType.Direct)
     assertEquals(OwnershipType.fromString("I"), OwnershipType.Indirect)
     assertEquals(OwnershipType.fromString("d"), OwnershipType.Direct)
@@ -117,7 +117,7 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(OwnershipType.fromString("unknown"), OwnershipType.Direct) // Default
   }
 
-  test("OwnershipType.value should return correct string") {
+  test("represents ownership type as string") {
     assertEquals(OwnershipType.Direct.value, "D")
     assertEquals(OwnershipType.Indirect.value, "I")
   }

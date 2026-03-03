@@ -7,7 +7,7 @@ import java.time.LocalDate
 
 class InsiderRosterEntrySpec extends FunSuite {
 
-  test("totalPosition should sum direct and indirect holdings") {
+  test("sums direct and indirect holdings") {
     val entry = InsiderRosterEntry(
       name = "John Doe",
       relation = "CEO",
@@ -23,7 +23,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assertEquals(entry.totalPosition, 150000L)
   }
 
-  test("totalPosition should handle None values") {
+  test("treats absent holdings as zero when summing") {
     val entry = InsiderRosterEntry(
       name = "Jane Smith",
       relation = "CFO",
@@ -39,7 +39,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assertEquals(entry.totalPosition, 100000L)
   }
 
-  test("totalPosition should return 0 when both positions are None") {
+  test("returns zero position when both holdings are absent") {
     val entry = InsiderRosterEntry(
       name = "Test User",
       relation = "Director",
@@ -55,7 +55,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assertEquals(entry.totalPosition, 0L)
   }
 
-  test("hasPosition should return true when totalPosition > 0") {
+  test("has position when total holdings are positive") {
     val withPosition = InsiderRosterEntry("A", "CEO", None, None, Some(100L), None, None, None, None)
     val withoutPosition = InsiderRosterEntry("B", "CFO", None, None, None, None, None, None, None)
 
@@ -63,7 +63,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assert(!withoutPosition.hasPosition)
   }
 
-  test("hasIndirectHoldings should detect indirect positions") {
+  test("detects indirect holdings") {
     val withIndirect = InsiderRosterEntry("A", "CEO", None, None, Some(100L), None, Some(50L), None, None)
     val withoutIndirect = InsiderRosterEntry("B", "CFO", None, None, Some(100L), None, None, None, None)
     val zeroIndirect = InsiderRosterEntry("C", "COO", None, None, Some(100L), None, Some(0L), None, None)
@@ -73,7 +73,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assert(!zeroIndirect.hasIndirectHoldings)
   }
 
-  test("ordering should sort by total position descending") {
+  test("sorts by total position descending") {
     val e1 = InsiderRosterEntry("A", "CEO", None, None, Some(100L), None, Some(50L), None, None) // 150
     val e2 = InsiderRosterEntry("B", "CFO", None, None, Some(200L), None, None, None, None) // 200
     val e3 = InsiderRosterEntry("C", "COO", None, None, Some(50L), None, Some(25L), None, None) // 75
@@ -83,7 +83,7 @@ class InsiderRosterEntrySpec extends FunSuite {
     assertEquals(sorted.map(_.name), List("B", "A", "C"))
   }
 
-  test("hasPosition with only indirect holdings") {
+  test("has position with only indirect holdings") {
     val indirectOnly = InsiderRosterEntry("A", "CEO", None, None, None, None, Some(100L), None, None)
 
     assert(indirectOnly.hasPosition)

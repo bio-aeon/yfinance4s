@@ -48,21 +48,21 @@ class BalanceSheetSpec extends FunSuite {
     investedCapital = Some(163604000000.0)
   )
 
-  test("currentRatio should calculate correctly") {
+  test("calculates current ratio from current assets and liabilities") {
     val ratio = sampleSheet.currentRatio
     assert(ratio.isDefined)
     // 152987000000 / 176392000000 ~ 0.8673
     assert(Math.abs(ratio.get - 0.8673) < 0.001)
   }
 
-  test("quickRatio should calculate correctly") {
+  test("calculates quick ratio excluding inventory") {
     val ratio = sampleSheet.quickRatio
     assert(ratio.isDefined)
     // (152987000000 - 7286000000) / 176392000000 ~ 0.8260
     assert(Math.abs(ratio.get - 0.8260) < 0.001)
   }
 
-  test("quickRatio should handle missing inventory") {
+  test("treats missing inventory as zero in quick ratio") {
     val sheet = sampleSheet.copy(inventory = None)
     val ratio = sheet.quickRatio
     assert(ratio.isDefined)
@@ -71,55 +71,55 @@ class BalanceSheetSpec extends FunSuite {
     assert(Math.abs(ratio.get - 0.8673) < 0.001)
   }
 
-  test("debtToEquity should calculate correctly") {
+  test("calculates debt-to-equity ratio") {
     val ratio = sampleSheet.debtToEquity
     assert(ratio.isDefined)
     // 106654000000 / 56950000000 ~ 1.8727
     assert(Math.abs(ratio.get - 1.8727) < 0.001)
   }
 
-  test("debtToAssets should calculate correctly") {
+  test("calculates debt-to-assets ratio") {
     val ratio = sampleSheet.debtToAssets
     assert(ratio.isDefined)
     // 106654000000 / 364980000000 ~ 0.2922
     assert(Math.abs(ratio.get - 0.2922) < 0.001)
   }
 
-  test("bookValuePerShare should calculate correctly") {
+  test("calculates book value per share") {
     val bvps = sampleSheet.bookValuePerShare
     assert(bvps.isDefined)
     // 56950000000 / 15550000000 ~ 3.66
     assert(Math.abs(bvps.get - 3.66) < 0.01)
   }
 
-  test("tangibleBookValuePerShare should calculate correctly") {
+  test("calculates tangible book value per share") {
     val tbvps = sampleSheet.tangibleBookValuePerShare
     assert(tbvps.isDefined)
     // 56950000000 / 15550000000 ~ 3.66
     assert(Math.abs(tbvps.get - 3.66) < 0.01)
   }
 
-  test("currentRatio should return None when currentLiabilities is zero") {
+  test("returns no current ratio when current liabilities is zero") {
     val sheet = sampleSheet.copy(currentLiabilities = Some(0.0))
     assertEquals(sheet.currentRatio, None)
   }
 
-  test("currentRatio should return None when currentLiabilities is missing") {
+  test("returns no current ratio when current liabilities is absent") {
     val sheet = sampleSheet.copy(currentLiabilities = None)
     assertEquals(sheet.currentRatio, None)
   }
 
-  test("debtToEquity should return None when stockholdersEquity is zero") {
+  test("returns no debt-to-equity when equity is zero") {
     val sheet = sampleSheet.copy(stockholdersEquity = Some(0.0))
     assertEquals(sheet.debtToEquity, None)
   }
 
-  test("bookValuePerShare should return None when shares is zero") {
+  test("returns no book value per share when shares is zero") {
     val sheet = sampleSheet.copy(ordinarySharesNumber = Some(0.0))
     assertEquals(sheet.bookValuePerShare, None)
   }
 
-  test("balance sheets should sort by date descending") {
+  test("sorts by report date descending") {
     val older = sampleSheet.copy(reportDate = LocalDate.of(2023, 9, 28))
     val newer = sampleSheet.copy(reportDate = LocalDate.of(2024, 9, 28))
     val sorted = List(older, newer).sorted

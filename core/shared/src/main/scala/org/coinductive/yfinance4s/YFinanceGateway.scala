@@ -29,6 +29,8 @@ sealed trait YFinanceGateway[F[_]] {
   def getFinancials(ticker: Ticker, frequency: Frequency, statementType: String = "all"): F[YFinanceFinancialsResult]
 
   def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult]
+
+  def search(query: String, quotesCount: Int, newsCount: Int, enableFuzzyQuery: Boolean): F[YFinanceSearchResult]
 }
 
 private object YFinanceGateway {
@@ -66,6 +68,10 @@ private object YFinanceGateway {
 
     private val FinancialsEndpoint =
       uri"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
+
+    private val SearchEndpoint = uri"https://query2.finance.yahoo.com/v1/finance/search"
+    private val DefaultQuotesQueryId = "tss_match_phrase_query"
+    private val DefaultNewsQueryId = "news_cie_vespa"
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
@@ -224,6 +230,39 @@ private object YFinanceGateway {
       decode[YFinanceAnalystResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse analyst response: ${e.getMessage}")),
+          F.pure
+        )
+
+    def search(
+        query: String,
+        quotesCount: Int,
+        newsCount: Int,
+        enableFuzzyQuery: Boolean
+    ): F[YFinanceSearchResult] = {
+      val req = basicRequest.get(
+        SearchEndpoint.withParams(
+          ("q", query),
+          ("quotesCount", quotesCount.toString),
+          ("newsCount", newsCount.toString),
+          ("enableFuzzyQuery", enableFuzzyQuery.toString),
+          ("quotesQueryId", DefaultQuotesQueryId),
+          ("newsQueryId", DefaultNewsQueryId),
+          ("listsCount", quotesCount.toString),
+          ("enableCb", "true"),
+          ("enableNavLinks", "false"),
+          ("enableResearchReports", "false"),
+          ("enableCulturalAssets", "false"),
+          ("recommendedCount", quotesCount.toString)
+        )
+      )
+
+      sendRequest(req, parseSearchContent)
+    }
+
+    private def parseSearchContent(content: String): F[YFinanceSearchResult] =
+      decode[YFinanceSearchResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse search response: ${e.getMessage}")),
           F.pure
         )
 

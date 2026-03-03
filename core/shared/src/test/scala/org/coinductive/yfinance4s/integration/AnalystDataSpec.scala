@@ -15,9 +15,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getAnalystPriceTargets should return targets for AAPL") {
+  test("returns analyst price targets with valid ranges for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getAnalystPriceTargets(Ticker("AAPL")).map { result =>
+      client.analysts.getAnalystPriceTargets(Ticker("AAPL")).map { result =>
         assert(result.isDefined, "Result should be defined for AAPL")
         val targets = result.get
 
@@ -33,9 +33,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getRecommendations should return trends for MSFT") {
+  test("returns recommendation trends with current month for MSFT") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getRecommendations(Ticker("MSFT")).map { recommendations =>
+      client.analysts.getRecommendations(Ticker("MSFT")).map { recommendations =>
         assert(recommendations.nonEmpty, "MSFT should have recommendation trends")
 
         // Should have a current month entry
@@ -49,9 +49,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getUpgradeDowngradeHistory should return history for GOOGL") {
+  test("returns upgrade/downgrade history sorted by date for GOOGL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getUpgradeDowngradeHistory(Ticker("GOOGL")).map { history =>
+      client.analysts.getUpgradeDowngradeHistory(Ticker("GOOGL")).map { history =>
         assert(history.nonEmpty, "GOOGL should have upgrade/downgrade history")
 
         // Validate structure
@@ -67,9 +67,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getEarningsEstimates should return estimates for NVDA") {
+  test("returns quarterly and yearly earnings estimates for NVDA") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getEarningsEstimates(Ticker("NVDA")).map { estimates =>
+      client.analysts.getEarningsEstimates(Ticker("NVDA")).map { estimates =>
         assert(estimates.nonEmpty, "NVDA should have earnings estimates")
 
         // Should have both quarterly and yearly estimates
@@ -86,9 +86,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getRevenueEstimates should return estimates for AMZN") {
+  test("returns positive revenue estimates for AMZN") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getRevenueEstimates(Ticker("AMZN")).map { estimates =>
+      client.analysts.getRevenueEstimates(Ticker("AMZN")).map { estimates =>
         assert(estimates.nonEmpty, "AMZN should have revenue estimates")
 
         // Large company should have positive revenue estimates
@@ -101,9 +101,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getEarningsHistory should return historical results for AAPL") {
+  test("returns earnings history sorted by quarter for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getEarningsHistory(Ticker("AAPL")).map { history =>
+      client.analysts.getEarningsHistory(Ticker("AAPL")).map { history =>
         assert(history.nonEmpty, "AAPL should have earnings history")
 
         // Validate structure
@@ -118,9 +118,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getGrowthEstimates should return growth data for MSFT") {
+  test("returns growth estimates with stock growth data for MSFT") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getGrowthEstimates(Ticker("MSFT")).map { estimates =>
+      client.analysts.getGrowthEstimates(Ticker("MSFT")).map { estimates =>
         assert(estimates.nonEmpty, "MSFT should have growth estimates")
 
         // Should have stock growth for at least one period
@@ -129,9 +129,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getAnalystData should return comprehensive data for NVDA") {
+  test("returns comprehensive analyst data for NVDA") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getAnalystData(Ticker("NVDA")).map { dataOpt =>
+      client.analysts.getAnalystData(Ticker("NVDA")).map { dataOpt =>
         assert(dataOpt.isDefined, "Result should be defined for NVDA")
         val data = dataOpt.get
 
@@ -143,9 +143,9 @@ class AnalystDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getAnalystData should work for stocks with limited analyst data") {
+  test("returns analyst data for stock with limited coverage (IBM)") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getAnalystData(Ticker("IBM")).map { dataOpt =>
+      client.analysts.getAnalystData(Ticker("IBM")).map { dataOpt =>
         assert(dataOpt.isDefined, "Result should be defined for IBM")
         assert(dataOpt.get.nonEmpty, "IBM should have analyst data")
       }

@@ -15,9 +15,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getFinancialStatements should return yearly financial data for AAPL") {
+  test("returns yearly financial data for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFinancialStatements(Ticker("AAPL"), Frequency.Yearly).map { result =>
+      client.financials.getFinancialStatements(Ticker("AAPL"), Frequency.Yearly).map { result =>
         assert(result.isDefined, "Result should be defined for AAPL")
         val financials = result.get
 
@@ -43,9 +43,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getFinancialStatements should return quarterly data for MSFT") {
+  test("returns quarterly financial data sorted by date for MSFT") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFinancialStatements(Ticker("MSFT"), Frequency.Quarterly).map { result =>
+      client.financials.getFinancialStatements(Ticker("MSFT"), Frequency.Quarterly).map { result =>
         assert(result.isDefined, "Result should be defined for MSFT")
         val financials = result.get
 
@@ -61,9 +61,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getIncomeStatements should return income data for GOOGL") {
+  test("returns income statements with valid margins for GOOGL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getIncomeStatements(Ticker("GOOGL")).map { statements =>
+      client.financials.getIncomeStatements(Ticker("GOOGL")).map { statements =>
         assert(statements.nonEmpty, "GOOGL should have income statements")
 
         statements.foreach { stmt =>
@@ -91,9 +91,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getBalanceSheets should return balance sheet data for NVDA") {
+  test("returns balance sheets with valid ratios for NVDA") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getBalanceSheets(Ticker("NVDA")).map { sheets =>
+      client.financials.getBalanceSheets(Ticker("NVDA")).map { sheets =>
         assert(sheets.nonEmpty, "NVDA should have balance sheets")
 
         sheets.foreach { sheet =>
@@ -120,9 +120,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getCashFlowStatements should return cash flow data for AMZN") {
+  test("returns cash flow statements for AMZN") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getCashFlowStatements(Ticker("AMZN")).map { statements =>
+      client.financials.getCashFlowStatements(Ticker("AMZN")).map { statements =>
         assert(statements.nonEmpty, "AMZN should have cash flow statements")
 
         statements.foreach { stmt =>
@@ -142,9 +142,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getFinancialStatements should support trailing frequency") {
+  test("supports trailing (TTM) frequency for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFinancialStatements(Ticker("AAPL"), Frequency.Trailing).map { result =>
+      client.financials.getFinancialStatements(Ticker("AAPL"), Frequency.Trailing).map { result =>
         assert(result.isDefined, "Trailing result should be defined for AAPL")
         val financials = result.get
 
@@ -154,9 +154,9 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("cross-statement metrics should calculate correctly for AAPL") {
+  test("calculates cross-statement metrics (ROA, ROE, asset turnover) for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFinancialStatements(Ticker("AAPL")).map { result =>
+      client.financials.getFinancialStatements(Ticker("AAPL")).map { result =>
         assert(result.isDefined, "Result should be defined for AAPL")
         val financials = result.get
 
@@ -183,10 +183,10 @@ class FinancialStatementsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getFinancialStatements should work for stocks without all data") {
+  test("returns financial data for stock with limited data (IBM)") {
     YFinanceClient.resource[IO](config).use { client =>
       // Use a company that should have financials
-      client.getFinancialStatements(Ticker("IBM")).map { result =>
+      client.financials.getFinancialStatements(Ticker("IBM")).map { result =>
         assert(result.isDefined, "Result should be defined for IBM")
         // IBM should have at least some financial data
         val financials = result.get

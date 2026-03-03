@@ -8,7 +8,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 
 class SplitEventSpec extends FunSuite {
 
-  test("fromRaw should convert timestamp correctly") {
+  test("converts raw timestamp correctly") {
     val raw = SplitEventRaw(
       date = 1598832000L,
       numerator = 4,
@@ -24,7 +24,7 @@ class SplitEventSpec extends FunSuite {
     assertEquals(event.exDate.getMonthValue, 8)
   }
 
-  test("factor should calculate split ratio as decimal for forward split") {
+  test("calculates forward split factor (4:1 = 4.0)") {
     val forward4to1 = SplitEvent(
       exDate = ZonedDateTime.now(),
       numerator = 4,
@@ -34,7 +34,7 @@ class SplitEventSpec extends FunSuite {
     assertEquals(forward4to1.factor, 4.0)
   }
 
-  test("factor should calculate split ratio as decimal for reverse split") {
+  test("calculates reverse split factor (1:10 = 0.1)") {
     val reverse1to10 = SplitEvent(
       exDate = ZonedDateTime.now(),
       numerator = 1,
@@ -44,7 +44,7 @@ class SplitEventSpec extends FunSuite {
     assertEquals(reverse1to10.factor, 0.1)
   }
 
-  test("isForwardSplit should identify forward splits") {
+  test("identifies forward splits (numerator > denominator)") {
     val forwardSplit = SplitEvent(
       exDate = ZonedDateTime.now(),
       numerator = 4,
@@ -55,7 +55,7 @@ class SplitEventSpec extends FunSuite {
     assert(!forwardSplit.isReverseSplit)
   }
 
-  test("isReverseSplit should identify reverse splits") {
+  test("identifies reverse splits (numerator < denominator)") {
     val reverseSplit = SplitEvent(
       exDate = ZonedDateTime.now(),
       numerator = 1,
@@ -66,7 +66,7 @@ class SplitEventSpec extends FunSuite {
     assert(!reverseSplit.isForwardSplit)
   }
 
-  test("equal numerator and denominator should be neither forward nor reverse") {
+  test("1:1 ratio is neither forward nor reverse") {
     val noChange = SplitEvent(
       exDate = ZonedDateTime.now(),
       numerator = 1,
@@ -78,7 +78,7 @@ class SplitEventSpec extends FunSuite {
     assertEquals(noChange.factor, 1.0)
   }
 
-  test("ordering should sort by exDate chronologically") {
+  test("sorts by ex-date chronologically") {
     val event1 = SplitEvent(
       exDate = ZonedDateTime.of(2014, 6, 9, 0, 0, 0, 0, ZoneOffset.UTC),
       numerator = 7,

@@ -40,14 +40,14 @@ class CashFlowStatementSpec extends FunSuite {
     freeCashFlow = Some(108807000000.0)
   )
 
-  test("calculatedFreeCashFlow should calculate correctly") {
+  test("calculates free cash flow from operating cash flow minus capex") {
     val fcf = sampleStatement.calculatedFreeCashFlow
     assert(fcf.isDefined)
     // 118254000000 - abs(-9447000000) = 108807000000
     assertEquals(fcf.get, 108807000000.0)
   }
 
-  test("calculatedFreeCashFlow should handle positive capex value") {
+  test("handles positive capex value in free cash flow calculation") {
     // Some APIs report capex as positive
     val stmt = sampleStatement.copy(capitalExpenditure = Some(9447000000.0))
     val fcf = stmt.calculatedFreeCashFlow
@@ -55,7 +55,7 @@ class CashFlowStatementSpec extends FunSuite {
     assertEquals(fcf.get, 108807000000.0)
   }
 
-  test("freeCashFlowYield should calculate correctly") {
+  test("calculates free cash flow yield from market cap") {
     val marketCap = 3000000000000.0 // $3 trillion
     val fcfYield = sampleStatement.freeCashFlowYield(marketCap)
     assert(fcfYield.isDefined)
@@ -63,7 +63,7 @@ class CashFlowStatementSpec extends FunSuite {
     assert(Math.abs(fcfYield.get - 0.0363) < 0.001)
   }
 
-  test("freeCashFlowYield should use API freeCashFlow when available") {
+  test("prefers API free cash flow value for yield calculation") {
     val stmt = sampleStatement.copy(freeCashFlow = Some(100000000000.0))
     val marketCap = 3000000000000.0
     val fcfYield = stmt.freeCashFlowYield(marketCap)
@@ -72,7 +72,7 @@ class CashFlowStatementSpec extends FunSuite {
     assert(Math.abs(fcfYield.get - 0.0333) < 0.001)
   }
 
-  test("freeCashFlowYield should fall back to calculated when API value missing") {
+  test("falls back to calculated FCF when API value is absent") {
     val stmt = sampleStatement.copy(freeCashFlow = None)
     val marketCap = 3000000000000.0
     val fcfYield = stmt.freeCashFlowYield(marketCap)
@@ -81,28 +81,28 @@ class CashFlowStatementSpec extends FunSuite {
     assert(Math.abs(fcfYield.get - 0.0363) < 0.001)
   }
 
-  test("cashFlowToNetIncomeRatio should calculate correctly") {
+  test("calculates cash flow to net income ratio") {
     val ratio = sampleStatement.cashFlowToNetIncomeRatio
     assert(ratio.isDefined)
     // 118254000000 / 94663000000 ~ 1.249
     assert(Math.abs(ratio.get - 1.249) < 0.001)
   }
 
-  test("capexToOperatingCashFlow should calculate correctly") {
+  test("calculates capex to operating cash flow ratio") {
     val ratio = sampleStatement.capexToOperatingCashFlow
     assert(ratio.isDefined)
     // abs(-9447000000) / 118254000000 ~ 0.0799
     assert(Math.abs(ratio.get - 0.0799) < 0.001)
   }
 
-  test("netDebtChange should calculate correctly") {
+  test("calculates net debt change from repayment and issuance") {
     val change = sampleStatement.netDebtChange
     assert(change.isDefined)
     // abs(-12941000000) - abs(5000000000) = 7941000000
     assertEquals(change.get, 7941000000.0)
   }
 
-  test("netDebtChange should handle missing repayment") {
+  test("treats missing repayment as zero in net debt change") {
     val stmt = sampleStatement.copy(repaymentOfDebt = None)
     val change = stmt.netDebtChange
     assert(change.isDefined)
@@ -110,7 +110,7 @@ class CashFlowStatementSpec extends FunSuite {
     assertEquals(change.get, -5000000000.0)
   }
 
-  test("netDebtChange should handle missing issuance") {
+  test("treats missing issuance as zero in net debt change") {
     val stmt = sampleStatement.copy(issuanceOfDebt = None)
     val change = stmt.netDebtChange
     assert(change.isDefined)
@@ -118,17 +118,17 @@ class CashFlowStatementSpec extends FunSuite {
     assertEquals(change.get, 12941000000.0)
   }
 
-  test("cashFlowToNetIncomeRatio should return None when netIncome is zero") {
+  test("returns no cash flow ratio when net income is zero") {
     val stmt = sampleStatement.copy(netIncomeFromContinuingOperations = Some(0.0))
     assertEquals(stmt.cashFlowToNetIncomeRatio, None)
   }
 
-  test("capexToOperatingCashFlow should return None when operating cash flow is zero") {
+  test("returns no capex ratio when operating cash flow is zero") {
     val stmt = sampleStatement.copy(operatingCashFlow = Some(0.0))
     assertEquals(stmt.capexToOperatingCashFlow, None)
   }
 
-  test("cash flow statements should sort by date descending") {
+  test("sorts by report date descending") {
     val older = sampleStatement.copy(reportDate = LocalDate.of(2023, 9, 28))
     val newer = sampleStatement.copy(reportDate = LocalDate.of(2024, 9, 28))
     val sorted = List(older, newer).sorted

@@ -17,7 +17,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("downloadCharts should return data for multiple valid tickers") {
+  test("returns chart data for multiple valid tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"), Ticker("GOOGL"))
 
@@ -33,7 +33,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadCharts with date range should return data") {
+  test("returns chart data within date range for multiple tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"))
       val since = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -48,7 +48,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadCharts should fail when any ticker is invalid") {
+  test("fails when any ticker is invalid") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("INVALIDTICKER123"))
 
@@ -58,7 +58,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadCharts should respect parallelism parameter") {
+  test("respects parallelism parameter") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(
         Ticker("AAPL"),
@@ -74,7 +74,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadStocks should return data for multiple valid tickers") {
+  test("returns stock data for multiple valid tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"))
 
@@ -86,7 +86,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadStocks should fail when any ticker is invalid") {
+  test("fails when any stock ticker is invalid") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("INVALIDTICKER123"))
 
@@ -96,7 +96,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadFinancialStatements should return data for multiple tickers") {
+  test("returns financial statements for multiple tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"), Ticker("MSFT"))
 
@@ -109,7 +109,7 @@ class MultiTickerDownloadSpec extends CatsEffectSuite {
     }
   }
 
-  test("downloadCharts for single ticker in NonEmptyList should work") {
+  test("returns chart data for single ticker in NonEmptyList") {
     YFinanceClient.resource[IO](config).use { client =>
       val tickers = NonEmptyList.of(Ticker("AAPL"))
 

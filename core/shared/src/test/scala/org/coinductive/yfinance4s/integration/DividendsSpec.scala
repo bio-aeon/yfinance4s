@@ -16,9 +16,9 @@ class DividendsSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getDividends should return dividends for a dividend-paying stock (AAPL)") {
+  test("returns dividends for dividend-paying stock (AAPL)") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getDividends(Ticker("AAPL"), Interval.`1Day`, Range.`1Year`).map { dividendsOpt =>
+      client.charts.getDividends(Ticker("AAPL"), Interval.`1Day`, Range.`1Year`).map { dividendsOpt =>
         assert(dividendsOpt.isDefined, "Result should be defined for AAPL")
         val dividends = dividendsOpt.get
 
@@ -41,12 +41,12 @@ class DividendsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getDividends with date range should filter appropriately") {
+  test("filters dividends within specified date range") {
     YFinanceClient.resource[IO](config).use { client =>
       val now = ZonedDateTime.now()
       val sixMonthsAgo = now.minusMonths(6)
 
-      client.getDividends(Ticker("AAPL"), Interval.`1Day`, sixMonthsAgo, now).map { dividendsOpt =>
+      client.charts.getDividends(Ticker("AAPL"), Interval.`1Day`, sixMonthsAgo, now).map { dividendsOpt =>
         assert(dividendsOpt.isDefined, "Result should be defined")
         val dividends = dividendsOpt.get
 
@@ -64,9 +64,9 @@ class DividendsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getDividends should handle Max range for full dividend history") {
+  test("returns full dividend history with Max range") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getDividends(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { dividendsOpt =>
+      client.charts.getDividends(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { dividendsOpt =>
         assert(dividendsOpt.isDefined, "Result should be defined")
         val dividends = dividendsOpt.get
 
