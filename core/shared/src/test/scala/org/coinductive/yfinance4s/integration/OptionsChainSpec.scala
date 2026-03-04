@@ -18,9 +18,9 @@ class OptionsChainSpec extends CatsEffectSuite {
 
   val testTicker: Ticker = Ticker("AAPL")
 
-  test("getOptionExpirations should return sorted list of expiration dates for AAPL") {
+  test("returns sorted future expiration dates for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getOptionExpirations(testTicker).map { expirationsOpt =>
+      client.options.getOptionExpirations(testTicker).map { expirationsOpt =>
         assert(expirationsOpt.isDefined, "Expirations should be defined for AAPL")
 
         val expirations = expirationsOpt.get
@@ -38,15 +38,15 @@ class OptionsChainSpec extends CatsEffectSuite {
     }
   }
 
-  test("getOptionChain should return valid chain for nearest expiration") {
+  test("returns valid option chain for nearest expiration") {
     YFinanceClient.resource[IO](config).use { client =>
       for {
-        expirationsOpt <- client.getOptionExpirations(testTicker)
+        expirationsOpt <- client.options.getOptionExpirations(testTicker)
         _ = assert(expirationsOpt.isDefined, "Need expirations to test chain")
         expirations = expirationsOpt.get
         nearestExpiration = expirations.head
 
-        chainOpt <- client.getOptionChain(testTicker, nearestExpiration)
+        chainOpt <- client.options.getOptionChain(testTicker, nearestExpiration)
       } yield {
         assert(chainOpt.isDefined, s"Chain should exist for $nearestExpiration")
 
@@ -75,9 +75,9 @@ class OptionsChainSpec extends CatsEffectSuite {
     }
   }
 
-  test("getFullOptionChain should return complete data for AAPL") {
+  test("returns complete option chain data for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFullOptionChain(testTicker).map { fullChainOpt =>
+      client.options.getFullOptionChain(testTicker).map { fullChainOpt =>
         assert(fullChainOpt.isDefined, "Full chain should be defined")
 
         val fullChain = fullChainOpt.get
@@ -102,9 +102,9 @@ class OptionsChainSpec extends CatsEffectSuite {
     }
   }
 
-  test("implied volatility should be positive (converted to percentage)") {
+  test("implied volatility is positive for all contracts") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getFullOptionChain(testTicker).map { fullChainOpt =>
+      client.options.getFullOptionChain(testTicker).map { fullChainOpt =>
         assert(fullChainOpt.isDefined)
 
         val chain = fullChainOpt.get.nearestChain.get

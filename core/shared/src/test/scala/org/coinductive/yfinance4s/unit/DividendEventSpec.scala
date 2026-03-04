@@ -8,7 +8,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 
 class DividendEventSpec extends FunSuite {
 
-  test("fromRaw should convert timestamp to ZonedDateTime correctly") {
+  test("converts raw timestamp to ZonedDateTime") {
     val raw = DividendEventRaw(amount = 0.24, date = 1704067200L)
     val event = DividendEvent.fromRaw("1704067200", raw)
 
@@ -19,7 +19,7 @@ class DividendEventSpec extends FunSuite {
     assertEquals(event.exDate.getZone, ZoneOffset.UTC)
   }
 
-  test("yieldAt should calculate dividend yield correctly") {
+  test("calculates dividend yield at given share price") {
     val event = DividendEvent(
       exDate = ZonedDateTime.now(),
       amount = 0.24
@@ -30,7 +30,7 @@ class DividendEventSpec extends FunSuite {
     assert(Math.abs(yieldValue - 0.0024) < 0.0001)
   }
 
-  test("yieldAt should return 0 for zero share price") {
+  test("returns zero yield for zero share price") {
     val event = DividendEvent(
       exDate = ZonedDateTime.now(),
       amount = 0.24
@@ -39,7 +39,7 @@ class DividendEventSpec extends FunSuite {
     assertEquals(event.yieldAt(0.0), 0.0)
   }
 
-  test("yieldAt should return 0 for negative share price") {
+  test("returns zero yield for negative share price") {
     val event = DividendEvent(
       exDate = ZonedDateTime.now(),
       amount = 0.24
@@ -48,7 +48,7 @@ class DividendEventSpec extends FunSuite {
     assertEquals(event.yieldAt(-10.0), 0.0)
   }
 
-  test("ordering should sort by exDate chronologically") {
+  test("sorts by ex-date chronologically") {
     val event1 = DividendEvent(
       exDate = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC),
       amount = 0.20

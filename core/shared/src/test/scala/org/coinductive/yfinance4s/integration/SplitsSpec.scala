@@ -15,9 +15,9 @@ class SplitsSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getSplits should return splits for a stock with split history (AAPL)") {
+  test("returns splits for stock with split history (AAPL)") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { splitsOpt =>
+      client.charts.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { splitsOpt =>
         assert(splitsOpt.isDefined, "Result should be defined for AAPL")
         val splits = splitsOpt.get
 
@@ -39,9 +39,9 @@ class SplitsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getSplits should identify forward and reverse splits correctly") {
+  test("identifies forward and reverse splits correctly") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { splitsOpt =>
+      client.charts.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { splitsOpt =>
         splitsOpt.foreach { splits =>
           splits.foreach { split =>
             // Apple's splits have been forward splits
@@ -57,10 +57,10 @@ class SplitsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getSplits should return empty list for stocks without splits in range") {
+  test("returns empty list when no splits in range") {
     YFinanceClient.resource[IO](config).use { client =>
       // Use a short range where most stocks won't have splits
-      client.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.`1Month`).map { splitsOpt =>
+      client.charts.getSplits(Ticker("AAPL"), Interval.`1Day`, Range.`1Month`).map { splitsOpt =>
         assert(splitsOpt.isDefined, "Result should be defined")
         // Likely empty for 1 month, but structure should be valid
         splitsOpt.foreach { splits =>

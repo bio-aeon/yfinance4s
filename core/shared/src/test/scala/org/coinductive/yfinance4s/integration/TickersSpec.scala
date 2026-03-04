@@ -18,7 +18,7 @@ class TickersSpec extends CatsEffectSuite {
 
   // --- Fail-Fast Tests ---
 
-  test("history should return chart data for all tickers") {
+  test("returns chart data for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.history(Interval.`1Day`, Range.`1Month`).map { results =>
@@ -32,7 +32,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("history with date range should return chart data") {
+  test("returns chart data within date range") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       val since = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -46,7 +46,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("info should return stock data for all tickers") {
+  test("returns stock data for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.info.map { results =>
@@ -57,7 +57,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("financials should return financial statements for all tickers") {
+  test("returns financial statements for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.financials().map { results =>
@@ -69,7 +69,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("dividends should return dividend events for all tickers") {
+  test("returns dividend events for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.dividends(Interval.`1Day`, Range.Max).map { results =>
@@ -81,7 +81,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("splits should return split events for all tickers") {
+  test("returns split events for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.splits(Interval.`1Day`, Range.Max).map { results =>
@@ -90,7 +90,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("corporateActions should return combined actions for all tickers") {
+  test("returns combined corporate actions for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.corporateActions(Interval.`1Day`, Range.Max).map { results =>
@@ -99,7 +99,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("holdersData should return holders information for all tickers") {
+  test("returns holders information for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.holdersData.map { results =>
@@ -108,7 +108,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("analystData should return analyst information for all tickers") {
+  test("returns analyst information for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.analystData.map { results =>
@@ -117,7 +117,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("optionExpirations should return expiration dates for all tickers") {
+  test("returns option expiration dates for all tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.optionExpirations.map { results =>
@@ -129,7 +129,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("history should fail when any ticker is invalid") {
+  test("fails when any ticker is invalid") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "INVALIDTICKER123")
       t.history(Interval.`1Day`, Range.`1Month`).attempt.map { result =>
@@ -140,7 +140,7 @@ class TickersSpec extends CatsEffectSuite {
 
   // --- Error-Tolerant Tests ---
 
-  test("attemptHistory should return Right for valid tickers") {
+  test("returns Right for valid tickers in error-tolerant mode") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT")
       t.attemptHistory(Interval.`1Day`, Range.`1Month`).map { results =>
@@ -152,7 +152,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("attemptHistory should return Left for invalid tickers without failing") {
+  test("returns Left for invalid tickers without failing") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "INVALIDTICKER123")
       t.attemptHistory(Interval.`1Day`, Range.`1Month`).map { results =>
@@ -163,7 +163,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("attemptInfo should return Right for valid and Left for invalid") {
+  test("returns Right for valid and Left for invalid tickers") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "INVALIDTICKER123")
       t.attemptInfo.map { results =>
@@ -176,7 +176,7 @@ class TickersSpec extends CatsEffectSuite {
 
   // --- Chaining Tests ---
 
-  test("add then history should include the added ticker") {
+  test("includes added ticker in subsequent history call") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.single[IO](client, Ticker("AAPL")).add(Ticker("MSFT"))
       t.history(Interval.`1Day`, Range.`1Month`).map { results =>
@@ -187,7 +187,7 @@ class TickersSpec extends CatsEffectSuite {
     }
   }
 
-  test("withParallelism should work with data methods") {
+  test("respects parallelism setting in data methods") {
     YFinanceClient.resource[IO](config).use { client =>
       val t = Tickers.of[IO](client, "AAPL", "MSFT", "GOOGL").withParallelism(1)
       t.history(Interval.`1Day`, Range.`1Month`).map { results =>

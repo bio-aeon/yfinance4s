@@ -15,9 +15,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getMajorHolders should return ownership breakdown for AAPL") {
+  test("returns ownership breakdown for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getMajorHolders(Ticker("AAPL")).map { holdersOpt =>
+      client.holders.getMajorHolders(Ticker("AAPL")).map { holdersOpt =>
         assert(holdersOpt.isDefined, "Result should be defined for AAPL")
         val holders = holdersOpt.get
 
@@ -40,9 +40,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getInstitutionalHolders should return top holders for MSFT") {
+  test("returns top institutional holders for MSFT sorted by percentage") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getInstitutionalHolders(Ticker("MSFT")).map { holders =>
+      client.holders.getInstitutionalHolders(Ticker("MSFT")).map { holders =>
         // Should have institutional holders
         assert(holders.nonEmpty, "MSFT should have institutional holders")
 
@@ -60,9 +60,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getMutualFundHolders should return fund holders for GOOGL") {
+  test("returns mutual fund holders for GOOGL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getMutualFundHolders(Ticker("GOOGL")).map { holders =>
+      client.holders.getMutualFundHolders(Ticker("GOOGL")).map { holders =>
         // Should have mutual fund holders
         assert(holders.nonEmpty, "GOOGL should have mutual fund holders")
 
@@ -74,9 +74,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getInsiderTransactions should return recent transactions for AAPL") {
+  test("returns recent insider transactions for AAPL sorted by date") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getInsiderTransactions(Ticker("AAPL")).map { transactions =>
+      client.holders.getInsiderTransactions(Ticker("AAPL")).map { transactions =>
         // AAPL typically has insider activity
         assert(transactions.nonEmpty, "AAPL should have insider transactions")
 
@@ -93,9 +93,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getInsiderRoster should return insider positions for TSLA") {
+  test("returns insider positions for TSLA") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getInsiderRoster(Ticker("TSLA")).map { roster =>
+      client.holders.getInsiderRoster(Ticker("TSLA")).map { roster =>
         // Should have insider roster
         assert(roster.nonEmpty, "TSLA should have insider roster")
 
@@ -108,9 +108,9 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getHoldersData should return comprehensive data for NVDA") {
+  test("returns comprehensive holders data for NVDA") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getHoldersData(Ticker("NVDA")).map { dataOpt =>
+      client.holders.getHoldersData(Ticker("NVDA")).map { dataOpt =>
         assert(dataOpt.isDefined, "Result should be defined for NVDA")
         val data = dataOpt.get
 
@@ -123,10 +123,10 @@ class HoldersDataSpec extends CatsEffectSuite {
     }
   }
 
-  test("getHoldersData should work for stocks with limited holder data") {
+  test("returns holders data for stock with limited data (IBM)") {
     YFinanceClient.resource[IO](config).use { client =>
       // Use a smaller company that should still have some holder data
-      client.getHoldersData(Ticker("IBM")).map { dataOpt =>
+      client.holders.getHoldersData(Ticker("IBM")).map { dataOpt =>
         assert(dataOpt.isDefined, "Result should be defined for IBM")
         // IBM should have at least some holders data
         assert(dataOpt.get.nonEmpty, "IBM should have holders data")

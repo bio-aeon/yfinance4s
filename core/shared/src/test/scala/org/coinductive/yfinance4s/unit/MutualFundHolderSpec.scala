@@ -7,7 +7,7 @@ import java.time.LocalDate
 
 class MutualFundHolderSpec extends FunSuite {
 
-  test("percentHeldFormatted should convert decimal to percentage") {
+  test("formats decimal holdings as percentage") {
     val holder = MutualFundHolder(
       organization = "Vanguard Total Stock Market Index Fund",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -19,7 +19,7 @@ class MutualFundHolderSpec extends FunSuite {
     assert(Math.abs(holder.percentHeldFormatted - 3.12) < 0.001)
   }
 
-  test("averageCostPerShare should calculate correctly") {
+  test("calculates average cost per share from market value and shares") {
     val holder = MutualFundHolder(
       organization = "Fidelity Growth Fund",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -31,7 +31,7 @@ class MutualFundHolderSpec extends FunSuite {
     assertEquals(holder.averageCostPerShare, Some(200.0))
   }
 
-  test("averageCostPerShare should return None for zero shares") {
+  test("returns no average cost when shares are zero") {
     val holder = MutualFundHolder(
       organization = "Empty Fund",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -43,7 +43,7 @@ class MutualFundHolderSpec extends FunSuite {
     assertEquals(holder.averageCostPerShare, None)
   }
 
-  test("ordering should sort by percentage descending") {
+  test("sorts by percentage held descending") {
     val holder1 = MutualFundHolder("Fund A", LocalDate.now(), 0.02, 100, 1000)
     val holder2 = MutualFundHolder("Fund B", LocalDate.now(), 0.05, 200, 2000)
     val holder3 = MutualFundHolder("Fund C", LocalDate.now(), 0.01, 50, 500)

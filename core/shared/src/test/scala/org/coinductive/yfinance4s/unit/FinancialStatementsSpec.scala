@@ -119,93 +119,93 @@ class FinancialStatementsSpec extends FunSuite {
     cashFlowStatements = List(sampleCashFlowStatement)
   )
 
-  test("returnOnAssets should calculate correctly") {
+  test("calculates return on assets from net income and total assets") {
     val roa = sampleFinancials.returnOnAssets
     assert(roa.isDefined)
     // 94663000000 / 364980000000 ~ 0.2594
     assert(Math.abs(roa.get - 0.2594) < 0.001)
   }
 
-  test("returnOnEquity should calculate correctly") {
+  test("calculates return on equity from net income and equity") {
     val roe = sampleFinancials.returnOnEquity
     assert(roe.isDefined)
     // 94663000000 / 56950000000 ~ 1.662
     assert(Math.abs(roe.get - 1.662) < 0.001)
   }
 
-  test("assetTurnover should calculate correctly") {
+  test("calculates asset turnover from revenue and total assets") {
     val turnover = sampleFinancials.assetTurnover
     assert(turnover.isDefined)
     // 383285000000 / 364980000000 ~ 1.050
     assert(Math.abs(turnover.get - 1.050) < 0.001)
   }
 
-  test("interestCoverage should calculate correctly") {
+  test("calculates interest coverage from EBIT and interest expense") {
     val coverage = sampleFinancials.interestCoverage
     assert(coverage.isDefined)
     // 113033000000 / abs(3000000000) ~ 37.68
     assert(Math.abs(coverage.get - 37.68) < 0.01)
   }
 
-  test("returnOnAssets should return None when totalAssets is zero") {
+  test("returns no ROA when total assets is zero") {
     val modified = sampleFinancials.copy(
       balanceSheets = List(sampleBalanceSheet.copy(totalAssets = Some(0.0)))
     )
     assertEquals(modified.returnOnAssets, None)
   }
 
-  test("returnOnAssets should return None when totalAssets is missing") {
+  test("returns no ROA when total assets is absent") {
     val modified = sampleFinancials.copy(
       balanceSheets = List(sampleBalanceSheet.copy(totalAssets = None))
     )
     assertEquals(modified.returnOnAssets, None)
   }
 
-  test("returnOnEquity should return None when stockholdersEquity is zero") {
+  test("returns no ROE when stockholders equity is zero") {
     val modified = sampleFinancials.copy(
       balanceSheets = List(sampleBalanceSheet.copy(stockholdersEquity = Some(0.0)))
     )
     assertEquals(modified.returnOnEquity, None)
   }
 
-  test("interestCoverage should return None when interestExpense is zero") {
+  test("returns no interest coverage when interest expense is zero") {
     val modified = sampleFinancials.copy(
       incomeStatements = List(sampleIncomeStatement.copy(interestExpense = Some(0.0)))
     )
     assertEquals(modified.interestCoverage, None)
   }
 
-  test("interestCoverage should return None when interestExpense is missing") {
+  test("returns no interest coverage when interest expense is absent") {
     val modified = sampleFinancials.copy(
       incomeStatements = List(sampleIncomeStatement.copy(interestExpense = None))
     )
     assertEquals(modified.interestCoverage, None)
   }
 
-  test("nonEmpty should return true when any statements exist") {
+  test("is non-empty when any statements exist") {
     assert(sampleFinancials.nonEmpty)
   }
 
-  test("nonEmpty should return false when all statements are empty") {
+  test("is empty when all statement lists are empty") {
     val empty = FinancialStatements.empty(Ticker("TEST"))
     assert(!empty.nonEmpty)
   }
 
-  test("isEmpty should return true when no statements exist") {
+  test("reports empty when no statements exist") {
     val empty = FinancialStatements.empty(Ticker("TEST"))
     assert(empty.isEmpty)
   }
 
-  test("latestIncomeStatement should return the first statement") {
+  test("returns most recent income statement") {
     assertEquals(sampleFinancials.latestIncomeStatement, Some(sampleIncomeStatement))
   }
 
-  test("latestIncomeStatement should return None when no statements exist") {
+  test("returns no latest income statement when list is empty") {
     val empty = sampleFinancials.copy(incomeStatements = List.empty)
     assertEquals(empty.latestIncomeStatement, None)
   }
 
-  test("periodCount should return the maximum of all statement counts") {
+  test("period count equals maximum across all statement types") {
     val multi = sampleFinancials.copy(
       incomeStatements =
         List(sampleIncomeStatement, sampleIncomeStatement.copy(reportDate = LocalDate.of(2023, 9, 28))),

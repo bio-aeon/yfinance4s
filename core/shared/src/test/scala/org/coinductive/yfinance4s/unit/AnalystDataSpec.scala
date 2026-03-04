@@ -20,49 +20,49 @@ class AnalystDataSpec extends FunSuite {
     recommendationMean = 1.8
   )
 
-  test("meanUpsidePercent should calculate positive upside correctly") {
+  test("calculates positive upside percent from current to mean target") {
     // (215 - 200) / 200 * 100 = 7.5%
     assert(Math.abs(priceTargets.meanUpsidePercent - 7.5) < 0.001)
   }
 
-  test("meanUpsidePercent should calculate negative downside correctly") {
+  test("calculates negative downside when current exceeds mean target") {
     val overpriced = priceTargets.copy(currentPrice = 230.0)
     // (215 - 230) / 230 * 100 = -6.521...
     assert(overpriced.meanUpsidePercent < 0)
   }
 
-  test("meanUpsidePercent should return 0 when current price is 0") {
+  test("returns zero upside when current price is zero") {
     val zeroPrice = priceTargets.copy(currentPrice = 0.0)
     assertEquals(zeroPrice.meanUpsidePercent, 0.0)
   }
 
-  test("medianUpsidePercent should calculate correctly") {
+  test("calculates median upside percent") {
     // (220 - 200) / 200 * 100 = 10.0%
     assert(Math.abs(priceTargets.medianUpsidePercent - 10.0) < 0.001)
   }
 
-  test("targetRange should calculate high minus low") {
+  test("calculates target range as high minus low") {
     // 250 - 180 = 70
     assert(Math.abs(priceTargets.targetRange - 70.0) < 0.001)
   }
 
-  test("targetSpreadPercent should calculate spread relative to mean") {
+  test("calculates target spread as percentage of mean") {
     // 70 / 215 * 100 = 32.558...
     assert(priceTargets.targetSpreadPercent > 32.0 && priceTargets.targetSpreadPercent < 33.0)
   }
 
-  test("targetSpreadPercent should return 0 when mean is 0") {
+  test("returns zero spread when mean target is zero") {
     val zeroMean = priceTargets.copy(targetMean = 0.0)
     assertEquals(zeroMean.targetSpreadPercent, 0.0)
   }
 
-  test("isBelowAllTargets should return true when price below lowest target") {
+  test("detects price below all analyst targets") {
     val cheapStock = priceTargets.copy(currentPrice = 170.0)
     assert(cheapStock.isBelowAllTargets)
     assert(!priceTargets.isBelowAllTargets)
   }
 
-  test("isAboveAllTargets should return true when price above highest target") {
+  test("detects price above all analyst targets") {
     val expensiveStock = priceTargets.copy(currentPrice = 260.0)
     assert(expensiveStock.isAboveAllTargets)
     assert(!priceTargets.isAboveAllTargets)
@@ -79,48 +79,48 @@ class AnalystDataSpec extends FunSuite {
     strongSell = 0
   )
 
-  test("totalAnalysts should sum all categories") {
+  test("sums all analyst categories") {
     assertEquals(recTrend.totalAnalysts, 49)
   }
 
-  test("totalBullish should sum strongBuy and buy") {
+  test("sums strong buy and buy into bullish count") {
     assertEquals(recTrend.totalBullish, 40)
   }
 
-  test("totalBearish should sum sell and strongSell") {
+  test("sums sell and strong sell into bearish count") {
     assertEquals(recTrend.totalBearish, 1)
   }
 
-  test("bullishPercent should calculate correctly") {
+  test("calculates bullish percent of total analysts") {
     // 40 / 49 * 100 = 81.63...
     assert(recTrend.bullishPercent > 81.0 && recTrend.bullishPercent < 82.0)
   }
 
-  test("bearishPercent should return 0 when no analysts") {
+  test("returns zero bearish percent when no analysts") {
     val empty = recTrend.copy(strongBuy = 0, buy = 0, hold = 0, sell = 0, strongSell = 0)
     assertEquals(empty.bearishPercent, 0.0)
   }
 
-  test("netSentiment should be positive when more bulls") {
+  test("net sentiment is positive when more bulls than bears") {
     assert(recTrend.netSentiment > 0)
     assertEquals(recTrend.netSentiment, 39) // 40 - 1
   }
 
-  test("netSentiment should be negative when more bears") {
+  test("net sentiment is negative when more bears than bulls") {
     val bearish = recTrend.copy(strongBuy = 0, buy = 1, sell = 10, strongSell = 5)
     assert(bearish.netSentiment < 0)
   }
 
-  test("isBullish should return true when bullish > 50%") {
+  test("is bullish when majority of analysts are bullish") {
     assert(recTrend.isBullish)
   }
 
-  test("isBullish should return false when bullish <= 50%") {
+  test("is not bullish when majority are neutral or bearish") {
     val neutral = recTrend.copy(strongBuy = 1, buy = 1, hold = 10, sell = 1, strongSell = 1)
     assert(!neutral.isBullish)
   }
 
-  test("RecommendationTrend ordering should sort current month first") {
+  test("sorts recommendation trends with current month first") {
     val trends = List(
       recTrend.copy(period = "-2m"),
       recTrend.copy(period = "0m"),
@@ -141,32 +141,32 @@ class AnalystDataSpec extends FunSuite {
     action = UpgradeDowngradeAction.Upgrade
   )
 
-  test("isUpgrade should return true for upgrade actions") {
+  test("identifies upgrade actions") {
     assert(upgrade.isUpgrade)
     assert(!upgrade.isDowngrade)
     assert(!upgrade.isInitiation)
     assert(!upgrade.isMaintained)
   }
 
-  test("isDowngrade should return true for downgrade actions") {
+  test("identifies downgrade actions") {
     val downgrade = upgrade.copy(action = UpgradeDowngradeAction.Downgrade)
     assert(downgrade.isDowngrade)
     assert(!downgrade.isUpgrade)
   }
 
-  test("isInitiation should return true for init actions") {
+  test("identifies initiation actions") {
     val initiation = upgrade.copy(action = UpgradeDowngradeAction.Initiation, fromGrade = None)
     assert(initiation.isInitiation)
   }
 
-  test("isMaintained should return true for main and reit actions") {
+  test("identifies maintained and reiterated actions") {
     val maintained = upgrade.copy(action = UpgradeDowngradeAction.Maintained)
     val reiterated = upgrade.copy(action = UpgradeDowngradeAction.Reiterated)
     assert(maintained.isMaintained)
     assert(reiterated.isMaintained)
   }
 
-  test("UpgradeDowngradeAction.fromString should handle known actions") {
+  test("parses known upgrade/downgrade action strings") {
     assertEquals(UpgradeDowngradeAction.fromString("up"), UpgradeDowngradeAction.Upgrade)
     assertEquals(UpgradeDowngradeAction.fromString("down"), UpgradeDowngradeAction.Downgrade)
     assertEquals(UpgradeDowngradeAction.fromString("main"), UpgradeDowngradeAction.Maintained)
@@ -174,13 +174,13 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(UpgradeDowngradeAction.fromString("init"), UpgradeDowngradeAction.Initiation)
   }
 
-  test("UpgradeDowngradeAction.fromString should handle unknown actions with Other") {
+  test("wraps unknown action strings in Other") {
     val other = UpgradeDowngradeAction.fromString("suspend")
     assertEquals(other, UpgradeDowngradeAction.Other("suspend"))
     assertEquals(other.value, "suspend")
   }
 
-  test("UpgradeDowngrade ordering should sort most recent first") {
+  test("sorts upgrade/downgrade events most recent first") {
     val events = List(
       upgrade.copy(date = LocalDate.of(2023, 6, 1)),
       upgrade.copy(date = LocalDate.of(2024, 3, 15)),
@@ -210,36 +210,36 @@ class AnalystDataSpec extends FunSuite {
     growth = Some(0.12)
   )
 
-  test("EarningsEstimate estimateRange should calculate high minus low") {
+  test("calculates earnings estimate range as high minus low") {
     val range = earningsEst.estimateRange
     assert(range.isDefined)
     assert(Math.abs(range.get - 0.80) < 0.001)
   }
 
-  test("EarningsEstimate estimateSpreadPercent should calculate spread relative to average") {
+  test("calculates earnings estimate spread as percentage of average") {
     val spread = earningsEst.estimateSpreadPercent
     assert(spread.isDefined)
     // 0.80 / 2.04 * 100 = 39.21...
     assert(spread.get > 39.0 && spread.get < 40.0)
   }
 
-  test("EarningsEstimate estimateSpreadPercent should handle zero average") {
+  test("returns no estimate spread when average is zero") {
     val zeroAvg = earningsEst.copy(avg = Some(0.0))
     assertEquals(zeroAvg.estimateSpreadPercent, None)
   }
 
-  test("EarningsEstimate isQuarterly should identify quarterly periods") {
+  test("identifies quarterly earnings estimate periods") {
     assert(earningsEst.isQuarterly)
     assert(!earningsEst.isYearly)
   }
 
-  test("EarningsEstimate isYearly should identify yearly periods") {
+  test("identifies yearly earnings estimate periods") {
     val yearly = earningsEst.copy(period = "0y")
     assert(yearly.isYearly)
     assert(!yearly.isQuarterly)
   }
 
-  test("EarningsEstimate estimateRange should return None when data is missing") {
+  test("returns no earnings estimate range when data is absent") {
     val noHigh = earningsEst.copy(high = None)
     assertEquals(noHigh.estimateRange, None)
   }
@@ -257,24 +257,24 @@ class AnalystDataSpec extends FunSuite {
     growth = Some(-0.029)
   )
 
-  test("RevenueEstimate estimateRange should calculate high minus low") {
+  test("calculates revenue estimate range as high minus low") {
     val range = revenueEst.estimateRange
     assert(range.isDefined)
     assertEquals(range.get, 55838000000L - 48955000000L)
   }
 
-  test("RevenueEstimate isQuarterly should identify quarterly periods") {
+  test("identifies quarterly revenue estimate periods") {
     assert(revenueEst.isQuarterly)
     assert(!revenueEst.isYearly)
   }
 
-  test("RevenueEstimate isYearly should identify yearly periods") {
+  test("identifies yearly revenue estimate periods") {
     val yearly = revenueEst.copy(period = "+1y")
     assert(yearly.isYearly)
     assert(!yearly.isQuarterly)
   }
 
-  test("RevenueEstimate estimateRange should return None when data is missing") {
+  test("returns no revenue estimate range when data is absent") {
     val noData = revenueEst.copy(high = None, low = None)
     assertEquals(noData.estimateRange, None)
   }
@@ -290,34 +290,34 @@ class AnalystDataSpec extends FunSuite {
     ninetyDaysAgo = Some(2.07)
   )
 
-  test("changeSevenDays should calculate difference") {
+  test("calculates EPS change over seven days") {
     val change = epsTrend.changeSevenDays
     assert(change.isDefined)
     assert(Math.abs(change.get - 0.02) < 0.001)
   }
 
-  test("changeThirtyDays should calculate difference") {
+  test("calculates EPS change over thirty days") {
     val change = epsTrend.changeThirtyDays
     assert(change.isDefined)
     assert(Math.abs(change.get - 0.04) < 0.001)
   }
 
-  test("changeNinetyDays should calculate difference") {
+  test("calculates EPS change over ninety days") {
     val change = epsTrend.changeNinetyDays
     assert(change.isDefined)
     assert(Math.abs(change.get - (-0.03)) < 0.001)
   }
 
-  test("isTrendingUp should return true for positive 30-day change") {
+  test("trends up when 30-day EPS change is positive") {
     assertEquals(epsTrend.isTrendingUp, Some(true))
   }
 
-  test("isTrendingUp should return false for negative 30-day change") {
+  test("trends down when 30-day EPS change is negative") {
     val declining = epsTrend.copy(current = Some(1.95))
     assertEquals(declining.isTrendingUp, Some(false))
   }
 
-  test("EpsTrend change methods should return None when data is missing") {
+  test("returns no EPS trend data when current estimate is absent") {
     val noData = epsTrend.copy(current = None)
     assertEquals(noData.changeSevenDays, None)
     assertEquals(noData.changeThirtyDays, None)
@@ -335,20 +335,20 @@ class AnalystDataSpec extends FunSuite {
     downLast90Days = Some(3)
   )
 
-  test("netRevisions30Days should calculate up minus down") {
+  test("calculates net EPS revisions as ups minus downs") {
     assertEquals(epsRevisions.netRevisions30Days, Some(8))
   }
 
-  test("isPositiveTrend should return true when more ups") {
+  test("has positive revision trend when ups exceed downs") {
     assertEquals(epsRevisions.isPositiveTrend, Some(true))
   }
 
-  test("isPositiveTrend should return false when more downs") {
+  test("has negative revision trend when downs exceed ups") {
     val negative = epsRevisions.copy(upLast30Days = Some(1), downLast30Days = Some(5))
     assertEquals(negative.isPositiveTrend, Some(false))
   }
 
-  test("netRevisions30Days should return None when data is missing") {
+  test("returns no revision data when values are absent") {
     val noData = epsRevisions.copy(upLast30Days = None)
     assertEquals(noData.netRevisions30Days, None)
     assertEquals(noData.isPositiveTrend, None)
@@ -365,32 +365,32 @@ class AnalystDataSpec extends FunSuite {
     surprisePercent = Some(6.3)
   )
 
-  test("isBeat should return true when positive difference") {
+  test("identifies earnings beat when EPS exceeds estimate") {
     assertEquals(earningsHistoryEntry.isBeat, Some(true))
     assertEquals(earningsHistoryEntry.isMiss, Some(false))
   }
 
-  test("isMiss should return true when negative difference") {
+  test("identifies earnings miss when EPS falls short") {
     val miss = earningsHistoryEntry.copy(epsDifference = Some(-0.05))
     assertEquals(miss.isMiss, Some(true))
     assertEquals(miss.isBeat, Some(false))
   }
 
-  test("isMet should return true when zero difference") {
+  test("identifies met earnings when EPS matches estimate") {
     val met = earningsHistoryEntry.copy(epsDifference = Some(0.0))
     assertEquals(met.isMet, Some(true))
     assertEquals(met.isBeat, Some(false))
     assertEquals(met.isMiss, Some(false))
   }
 
-  test("EarningsHistory isBeat should return None when data is missing") {
+  test("returns no beat/miss status when EPS difference is absent") {
     val noData = earningsHistoryEntry.copy(epsDifference = None)
     assertEquals(noData.isBeat, None)
     assertEquals(noData.isMiss, None)
     assertEquals(noData.isMet, None)
   }
 
-  test("EarningsHistory ordering should sort most recent quarter first") {
+  test("sorts earnings history most recent quarter first") {
     val entries = List(
       earningsHistoryEntry.copy(quarter = LocalDate.of(2023, 6, 30)),
       earningsHistoryEntry.copy(quarter = LocalDate.of(2024, 3, 31)),
@@ -416,22 +416,22 @@ class AnalystDataSpec extends FunSuite {
     indexSymbol = Some("SP5")
   )
 
-  test("isOutperforming should return true when stock growth exceeds index") {
+  test("outperforms when stock growth exceeds index") {
     assertEquals(growthEst.isOutperforming, Some(true))
   }
 
-  test("isOutperforming should return false when stock underperforms") {
+  test("underperforms when stock growth trails index") {
     val underperforming = growthEst.copy(stockGrowth = Some(0.05))
     assertEquals(underperforming.isOutperforming, Some(false))
   }
 
-  test("growthDifferential should calculate difference") {
+  test("calculates growth differential as stock minus index") {
     val diff = growthEst.growthDifferential
     assert(diff.isDefined)
     assert(Math.abs(diff.get - 0.04) < 0.001)
   }
 
-  test("isOutperforming should return None when data is missing") {
+  test("returns no performance comparison when growth data is absent") {
     val noStock = growthEst.copy(stockGrowth = None)
     assertEquals(noStock.isOutperforming, None)
     assertEquals(noStock.growthDifferential, None)
@@ -443,41 +443,41 @@ class AnalystDataSpec extends FunSuite {
 
   // --- AnalystData tests ---
 
-  test("isEmpty should return true for empty AnalystData") {
+  test("empty instance is empty") {
     assert(AnalystData.empty.isEmpty)
   }
 
-  test("nonEmpty should return true when priceTargets is present") {
+  test("is non-empty when price targets are present") {
     val withTargets = AnalystData.empty.copy(priceTargets = Some(priceTargets))
     assert(withTargets.nonEmpty)
   }
 
-  test("nonEmpty should return true when recommendations is present") {
+  test("is non-empty when recommendations are present") {
     val withRecs = AnalystData.empty.copy(recommendations = List(recTrend))
     assert(withRecs.nonEmpty)
   }
 
-  test("nonEmpty should return true when earningsEstimates is present") {
+  test("is non-empty when earnings estimates are present") {
     val withEstimates = AnalystData.empty.copy(earningsEstimates = List(earningsEst))
     assert(withEstimates.nonEmpty)
   }
 
-  test("nonEmpty should return true when upgradeDowngradeHistory is present") {
+  test("is non-empty when upgrade/downgrade history is present") {
     val withHistory = AnalystData.empty.copy(upgradeDowngradeHistory = List(upgrade))
     assert(withHistory.nonEmpty)
   }
 
-  test("nonEmpty should return true when earningsHistory is present") {
+  test("is non-empty when earnings history is present") {
     val withEarnings = AnalystData.empty.copy(earningsHistory = List(earningsHistoryEntry))
     assert(withEarnings.nonEmpty)
   }
 
-  test("nonEmpty should return true when growthEstimates is present") {
+  test("is non-empty when growth estimates are present") {
     val withGrowth = AnalystData.empty.copy(growthEstimates = List(growthEst))
     assert(withGrowth.nonEmpty)
   }
 
-  test("currentRecommendation should find period 0m") {
+  test("finds current month recommendation (0m)") {
     val data = AnalystData.empty.copy(recommendations =
       List(
         recTrend.copy(period = "-1m"),
@@ -490,7 +490,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(current.get.period, "0m")
   }
 
-  test("currentRecommendation should return None when no 0m period") {
+  test("returns no current recommendation when 0m period absent") {
     val data = AnalystData.empty.copy(recommendations =
       List(
         recTrend.copy(period = "-1m"),
@@ -500,7 +500,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(data.currentRecommendation, None)
   }
 
-  test("currentQuarterEarningsEstimate should find period 0q") {
+  test("finds current quarter earnings estimate (0q)") {
     val data = AnalystData.empty.copy(earningsEstimates =
       List(
         earningsEst.copy(period = "+1q"),
@@ -513,7 +513,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(current.get.period, "0q")
   }
 
-  test("currentQuarterRevenueEstimate should find period 0q") {
+  test("finds current quarter revenue estimate (0q)") {
     val data = AnalystData.empty.copy(revenueEstimates =
       List(
         revenueEst.copy(period = "+1q"),
@@ -525,7 +525,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(current.get.period, "0q")
   }
 
-  test("currentYearEarningsEstimate should find period 0y") {
+  test("finds current year earnings estimate (0y)") {
     val data = AnalystData.empty.copy(earningsEstimates =
       List(
         earningsEst.copy(period = "0q"),
@@ -538,7 +538,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(current.get.period, "0y")
   }
 
-  test("consecutiveBeats should count consecutive beats from most recent") {
+  test("counts consecutive earnings beats from most recent") {
     val history = List(
       EarningsHistory(LocalDate.of(2024, 3, 31), "-1q", Some(1.5), Some(1.4), Some(0.1), Some(7.0)),
       EarningsHistory(LocalDate.of(2023, 12, 31), "-2q", Some(1.3), Some(1.2), Some(0.1), Some(8.0)),
@@ -551,7 +551,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(data.consecutiveBeats, 2)
   }
 
-  test("consecutiveBeats should return 0 when most recent is a miss") {
+  test("consecutive beats is zero when most recent is a miss") {
     val history = List(
       EarningsHistory(LocalDate.of(2024, 3, 31), "-1q", Some(1.3), Some(1.4), Some(-0.1), Some(-7.0)),
       EarningsHistory(LocalDate.of(2023, 12, 31), "-2q", Some(1.3), Some(1.2), Some(0.1), Some(8.0))
@@ -560,7 +560,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(data.consecutiveBeats, 0)
   }
 
-  test("recentUpgrades should filter and limit upgrades") {
+  test("filters and limits recent upgrades") {
     val events = List(
       UpgradeDowngrade(LocalDate.of(2024, 3, 1), "A", "Buy", Some("Hold"), UpgradeDowngradeAction.Upgrade),
       UpgradeDowngrade(LocalDate.of(2024, 2, 1), "B", "Hold", Some("Buy"), UpgradeDowngradeAction.Downgrade),
@@ -576,7 +576,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(upgrades(1).firm, "C")
   }
 
-  test("recentDowngrades should filter and limit downgrades") {
+  test("filters and limits recent downgrades") {
     val events = List(
       UpgradeDowngrade(LocalDate.of(2024, 3, 1), "A", "Buy", Some("Hold"), UpgradeDowngradeAction.Upgrade),
       UpgradeDowngrade(LocalDate.of(2024, 2, 1), "B", "Hold", Some("Buy"), UpgradeDowngradeAction.Downgrade),
@@ -589,7 +589,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(downgrades.head.firm, "B")
   }
 
-  test("earningsBeatRate should calculate percentage of beats") {
+  test("calculates earnings beat rate as percentage") {
     val history = List(
       EarningsHistory(LocalDate.of(2024, 3, 31), "-1q", Some(1.5), Some(1.4), Some(0.1), Some(7.0)),
       EarningsHistory(LocalDate.of(2023, 12, 31), "-2q", Some(1.3), Some(1.2), Some(0.1), Some(8.0)),
@@ -603,11 +603,11 @@ class AnalystDataSpec extends FunSuite {
     assert(Math.abs(rate.get - 75.0) < 0.001)
   }
 
-  test("earningsBeatRate should return None for empty history") {
+  test("returns no beat rate for empty history") {
     assertEquals(AnalystData.empty.earningsBeatRate, None)
   }
 
-  test("earningsBeatRate should return None when all epsDifference is None") {
+  test("returns no beat rate when all EPS differences are absent") {
     val history = List(
       EarningsHistory(LocalDate.of(2024, 3, 31), "-1q", None, None, None, None)
     )
@@ -615,7 +615,7 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(data.earningsBeatRate, None)
   }
 
-  test("empty AnalystData should return None for all accessors") {
+  test("empty instance returns defaults for all accessors") {
     val data = AnalystData.empty
     assertEquals(data.currentRecommendation, None)
     assertEquals(data.currentQuarterEarningsEstimate, None)

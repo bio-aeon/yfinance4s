@@ -37,62 +37,62 @@ class IncomeStatementSpec extends FunSuite {
     ebitda = Some(124478000000.0)
   )
 
-  test("grossMargin should calculate correctly") {
+  test("calculates gross margin from gross profit and revenue") {
     val margin = sampleStatement.grossMargin
     assert(margin.isDefined)
     // 169148000000 / 383285000000 ~ 0.4413
     assert(Math.abs(margin.get - 0.4413) < 0.001)
   }
 
-  test("operatingMargin should calculate correctly") {
+  test("calculates operating margin from operating income and revenue") {
     val margin = sampleStatement.operatingMargin
     assert(margin.isDefined)
     // 110436000000 / 383285000000 ~ 0.2881
     assert(Math.abs(margin.get - 0.2881) < 0.001)
   }
 
-  test("netMargin should calculate correctly") {
+  test("calculates net margin from net income and revenue") {
     val margin = sampleStatement.netMargin
     assert(margin.isDefined)
     // 94663000000 / 383285000000 ~ 0.2470
     assert(Math.abs(margin.get - 0.2470) < 0.001)
   }
 
-  test("ebitdaMargin should calculate correctly") {
+  test("calculates EBITDA margin from EBITDA and revenue") {
     val margin = sampleStatement.ebitdaMargin
     assert(margin.isDefined)
     // 124478000000 / 383285000000 ~ 0.3248
     assert(Math.abs(margin.get - 0.3248) < 0.001)
   }
 
-  test("effectiveTaxRate should calculate correctly") {
+  test("calculates effective tax rate from tax provision and pretax income") {
     val rate = sampleStatement.effectiveTaxRate
     assert(rate.isDefined)
     // 18370000000 / 113033000000 ~ 0.1625
     assert(Math.abs(rate.get - 0.1625) < 0.001)
   }
 
-  test("grossMargin should return None when revenue is zero") {
+  test("returns no gross margin when revenue is zero") {
     val stmt = sampleStatement.copy(totalRevenue = Some(0.0))
     assertEquals(stmt.grossMargin, None)
   }
 
-  test("grossMargin should return None when grossProfit is missing") {
+  test("returns no gross margin when gross profit is absent") {
     val stmt = sampleStatement.copy(grossProfit = None)
     assertEquals(stmt.grossMargin, None)
   }
 
-  test("grossMargin should return None when totalRevenue is missing") {
+  test("returns no gross margin when total revenue is absent") {
     val stmt = sampleStatement.copy(totalRevenue = None)
     assertEquals(stmt.grossMargin, None)
   }
 
-  test("effectiveTaxRate should return None when pretaxIncome is zero") {
+  test("returns no effective tax rate when pretax income is zero") {
     val stmt = sampleStatement.copy(pretaxIncome = Some(0.0))
     assertEquals(stmt.effectiveTaxRate, None)
   }
 
-  test("income statements should sort by date descending") {
+  test("sorts by report date descending") {
     val older = sampleStatement.copy(reportDate = LocalDate.of(2023, 9, 28))
     val newer = sampleStatement.copy(reportDate = LocalDate.of(2024, 9, 28))
     val sorted = List(older, newer).sorted

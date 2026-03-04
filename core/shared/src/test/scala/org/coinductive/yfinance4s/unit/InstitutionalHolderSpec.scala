@@ -7,7 +7,7 @@ import java.time.LocalDate
 
 class InstitutionalHolderSpec extends FunSuite {
 
-  test("percentHeldFormatted should convert decimal to percentage") {
+  test("formats decimal holdings as percentage") {
     val holder = InstitutionalHolder(
       organization = "Vanguard",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -19,7 +19,7 @@ class InstitutionalHolderSpec extends FunSuite {
     assert(Math.abs(holder.percentHeldFormatted - 9.01) < 0.001)
   }
 
-  test("averageCostPerShare should calculate correctly") {
+  test("calculates average cost per share from market value and shares") {
     val holder = InstitutionalHolder(
       organization = "BlackRock",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -31,7 +31,7 @@ class InstitutionalHolderSpec extends FunSuite {
     assertEquals(holder.averageCostPerShare, Some(150.0))
   }
 
-  test("averageCostPerShare should return None for zero shares") {
+  test("returns no average cost when shares are zero") {
     val holder = InstitutionalHolder(
       organization = "Empty Fund",
       reportDate = LocalDate.of(2024, 9, 30),
@@ -43,7 +43,7 @@ class InstitutionalHolderSpec extends FunSuite {
     assertEquals(holder.averageCostPerShare, None)
   }
 
-  test("ordering should sort by percentage descending") {
+  test("sorts by percentage held descending") {
     val holder1 = InstitutionalHolder("A", LocalDate.now(), 0.05, 100, 1000)
     val holder2 = InstitutionalHolder("B", LocalDate.now(), 0.10, 200, 2000)
     val holder3 = InstitutionalHolder("C", LocalDate.now(), 0.02, 50, 500)
@@ -53,7 +53,7 @@ class InstitutionalHolderSpec extends FunSuite {
     assertEquals(sorted.map(_.organization), List("B", "A", "C"))
   }
 
-  test("orderingByDate should sort by date descending") {
+  test("sorts by report date descending") {
     val holder1 = InstitutionalHolder("A", LocalDate.of(2024, 1, 1), 0.05, 100, 1000)
     val holder2 = InstitutionalHolder("B", LocalDate.of(2024, 6, 1), 0.05, 100, 1000)
     val holder3 = InstitutionalHolder("C", LocalDate.of(2024, 3, 1), 0.05, 100, 1000)

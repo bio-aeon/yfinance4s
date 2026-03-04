@@ -14,11 +14,11 @@ class YFinanceClientSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getStock should return correct symbol, longName and exchangeName for AAPL") {
+  test("returns symbol, longName, and exchangeName for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
       val ticker = Ticker("AAPL")
 
-      client.getStock(ticker).map { stockResultOpt =>
+      client.charts.getStock(ticker).map { stockResultOpt =>
         assert(stockResultOpt.isDefined, "Stock result should be defined for AAPL")
 
         val stockResult = stockResultOpt.get

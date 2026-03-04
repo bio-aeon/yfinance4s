@@ -7,11 +7,11 @@ import java.time.LocalDate
 
 class HoldersDataSpec extends FunSuite {
 
-  test("isEmpty should return true for empty HoldersData") {
+  test("empty instance is empty") {
     assert(HoldersData.empty.isEmpty)
   }
 
-  test("nonEmpty should return true when majorHolders is present") {
+  test("is non-empty when major holders are present") {
     val withMajor = HoldersData(
       majorHolders = Some(MajorHolders(0.05, 0.60, 0.62, 1000)),
       institutionalHolders = List.empty,
@@ -23,7 +23,7 @@ class HoldersDataSpec extends FunSuite {
     assert(withMajor.nonEmpty)
   }
 
-  test("nonEmpty should return true when institutionalHolders is present") {
+  test("is non-empty when institutional holders are present") {
     val withInstitutional = HoldersData(
       majorHolders = None,
       institutionalHolders = List(InstitutionalHolder("A", LocalDate.now(), 0.05, 100, 1000)),
@@ -35,7 +35,7 @@ class HoldersDataSpec extends FunSuite {
     assert(withInstitutional.nonEmpty)
   }
 
-  test("nonEmpty should return true when mutualFundHolders is present") {
+  test("is non-empty when mutual fund holders are present") {
     val withFunds = HoldersData(
       majorHolders = None,
       institutionalHolders = List.empty,
@@ -47,7 +47,7 @@ class HoldersDataSpec extends FunSuite {
     assert(withFunds.nonEmpty)
   }
 
-  test("nonEmpty should return true when insiderTransactions is present") {
+  test("is non-empty when insider transactions are present") {
     val withTransactions = HoldersData(
       majorHolders = None,
       institutionalHolders = List.empty,
@@ -61,7 +61,7 @@ class HoldersDataSpec extends FunSuite {
     assert(withTransactions.nonEmpty)
   }
 
-  test("nonEmpty should return true when insiderRoster is present") {
+  test("is non-empty when insider roster is present") {
     val withRoster = HoldersData(
       majorHolders = None,
       institutionalHolders = List.empty,
@@ -73,7 +73,7 @@ class HoldersDataSpec extends FunSuite {
     assert(withRoster.nonEmpty)
   }
 
-  test("totalInstitutionalCount should sum both holder lists") {
+  test("sums institutional and mutual fund holders") {
     val data = HoldersData(
       majorHolders = None,
       institutionalHolders = List(
@@ -90,7 +90,7 @@ class HoldersDataSpec extends FunSuite {
     assertEquals(data.totalInstitutionalCount, 3)
   }
 
-  test("topInstitutionalPercentage should sum percentages") {
+  test("sums top institutional holder percentages") {
     val data = HoldersData(
       majorHolders = None,
       institutionalHolders = List(
@@ -105,7 +105,7 @@ class HoldersDataSpec extends FunSuite {
     assert(Math.abs(data.topInstitutionalPercentage - 0.15) < 0.001)
   }
 
-  test("topMutualFundPercentage should sum percentages") {
+  test("sums top mutual fund holder percentages") {
     val data = HoldersData(
       majorHolders = None,
       institutionalHolders = List.empty,
@@ -120,7 +120,7 @@ class HoldersDataSpec extends FunSuite {
     assert(Math.abs(data.topMutualFundPercentage - 0.05) < 0.001)
   }
 
-  test("insiderPurchases and insiderSales should filter correctly") {
+  test("separates insider purchases from sales") {
     val purchase = InsiderTransaction("A", "CEO", LocalDate.now(), 1000, None, "Buy", OwnershipType.Direct, None)
     val sale = InsiderTransaction("B", "CFO", LocalDate.now(), -500, None, "Sell", OwnershipType.Direct, None)
 
@@ -138,7 +138,7 @@ class HoldersDataSpec extends FunSuite {
     assertEquals(data.insiderSales.head.filerName, "B")
   }
 
-  test("netInsiderShares should calculate net sentiment") {
+  test("calculates net insider share sentiment") {
     val purchase = InsiderTransaction("A", "CEO", LocalDate.now(), 1000, None, "Buy", OwnershipType.Direct, None)
     val sale = InsiderTransaction("B", "CFO", LocalDate.now(), -300, None, "Sell", OwnershipType.Direct, None)
 
@@ -153,7 +153,7 @@ class HoldersDataSpec extends FunSuite {
     assertEquals(data.netInsiderShares, 700L) // 1000 - 300
   }
 
-  test("netInsiderShares with only sales should be negative") {
+  test("net insider shares is negative when only sales exist") {
     val sale1 = InsiderTransaction("A", "CEO", LocalDate.now(), -1000, None, "Sell", OwnershipType.Direct, None)
     val sale2 = InsiderTransaction("B", "CFO", LocalDate.now(), -500, None, "Sell", OwnershipType.Direct, None)
 
@@ -168,7 +168,7 @@ class HoldersDataSpec extends FunSuite {
     assertEquals(data.netInsiderShares, -1500L)
   }
 
-  test("empty HoldersData should return zero for all aggregations") {
+  test("empty instance returns zero for all aggregations") {
     val data = HoldersData.empty
 
     assertEquals(data.topInstitutionalPercentage, 0.0)

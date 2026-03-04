@@ -15,9 +15,9 @@ class CorporateActionsSpec extends CatsEffectSuite {
     retries = 3
   )
 
-  test("getCorporateActions should return combined dividends and splits") {
+  test("returns combined dividends and splits for AAPL") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getCorporateActions(Ticker("AAPL"), Interval.`1Day`, Range.`5Years`).map { actionsOpt =>
+      client.charts.getCorporateActions(Ticker("AAPL"), Interval.`1Day`, Range.`5Years`).map { actionsOpt =>
         assert(actionsOpt.isDefined, "Result should be defined for AAPL")
         val actions = actionsOpt.get
 
@@ -33,9 +33,9 @@ class CorporateActionsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getCorporateActions cumulative split factor should calculate correctly") {
+  test("cumulative split factor matches product of individual factors") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getCorporateActions(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { actionsOpt =>
+      client.charts.getCorporateActions(Ticker("AAPL"), Interval.`1Day`, Range.Max).map { actionsOpt =>
         actionsOpt.foreach { actions =>
           val cumulativeFactor = actions.cumulativeSplitFactor
 
@@ -55,9 +55,9 @@ class CorporateActionsSpec extends CatsEffectSuite {
     }
   }
 
-  test("getChart should include corporate actions in ChartResult") {
+  test("embeds corporate actions in chart result") {
     YFinanceClient.resource[IO](config).use { client =>
-      client.getChart(Ticker("AAPL"), Interval.`1Day`, Range.`1Year`).map { chartOpt =>
+      client.charts.getChart(Ticker("AAPL"), Interval.`1Day`, Range.`1Year`).map { chartOpt =>
         assert(chartOpt.isDefined, "Chart should be defined for AAPL")
         val chart = chartOpt.get
 
