@@ -2,7 +2,7 @@ package org.coinductive.yfinance4s.unit
 
 import munit.FunSuite
 import org.coinductive.yfinance4s.models.SplitEvent
-import org.coinductive.yfinance4s.models.YFinanceQueryResult.SplitEventRaw
+import org.coinductive.yfinance4s.models.internal.YFinanceQueryResult.SplitEventRaw
 
 import java.time.{ZoneOffset, ZonedDateTime}
 

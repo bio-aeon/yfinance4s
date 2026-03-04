@@ -4,6 +4,7 @@ import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.*
+import org.coinductive.yfinance4s.models.internal.*
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 

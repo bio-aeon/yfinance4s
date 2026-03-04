@@ -1,8 +1,8 @@
-package org.coinductive.yfinance4s.models
+package org.coinductive.yfinance4s.models.internal
 
 import io.circe.{Decoder, HCursor}
 import io.circe.generic.semiauto.deriveDecoder
-import org.coinductive.yfinance4s.models.YFinanceQuoteResult.Value
+import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult.Value
 
 // --- Top-level result wrapper ---
 

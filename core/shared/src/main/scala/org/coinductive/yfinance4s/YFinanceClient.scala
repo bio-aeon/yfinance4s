@@ -8,6 +8,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
 import org.coinductive.yfinance4s.models.*
+import org.coinductive.yfinance4s.models.internal.*
 
 import java.time.ZonedDateTime
 
