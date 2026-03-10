@@ -1,11 +1,11 @@
-package org.coinductive.yfinance4s.models
+package org.coinductive.yfinance4s.models.internal
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser.decode
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
-import org.coinductive.yfinance4s.models.YFinanceQuoteResult.{Fundamentals, Summary}
+import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult.{Fundamentals, Summary}
 
 private[yfinance4s] final case class YFinanceQuoteResult(summary: Summary, fundamentals: Fundamentals)
 

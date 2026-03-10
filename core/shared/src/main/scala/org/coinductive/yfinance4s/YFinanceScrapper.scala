@@ -7,7 +7,8 @@ import cats.syntax.functor.*
 import cats.syntax.show.*
 import io.circe.parser.decode
 import org.coinductive.yfinance4s.html.PlatformHtmlParser
-import org.coinductive.yfinance4s.models.{Ticker, YFinanceQuoteResult}
+import org.coinductive.yfinance4s.models.Ticker
+import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult
 import retry.{RetryPolicies, RetryPolicy, Sleep}
 import sttp.client3.{SttpBackend, UriContext, basicRequest}
 

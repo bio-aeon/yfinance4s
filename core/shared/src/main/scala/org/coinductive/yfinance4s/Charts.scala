@@ -3,7 +3,8 @@ package org.coinductive.yfinance4s
 import cats.Functor
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.*
-import org.coinductive.yfinance4s.models.YFinanceQueryResult.InstrumentData
+import org.coinductive.yfinance4s.models.internal.{YFinanceQueryResult, YFinanceQuoteResult}
+import org.coinductive.yfinance4s.models.internal.YFinanceQueryResult.InstrumentData
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 

@@ -1,9 +1,9 @@
-package org.coinductive.yfinance4s.models
+package org.coinductive.yfinance4s.models.internal
 
 import cats.data.NonEmptyList
 import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
-import org.coinductive.yfinance4s.models.YFinanceQueryResult.Chart
+import org.coinductive.yfinance4s.models.internal.YFinanceQueryResult.Chart
 
 private[yfinance4s] final case class YFinanceQueryResult(chart: Chart)
 

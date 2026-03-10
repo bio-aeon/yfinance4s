@@ -1,4 +1,4 @@
-package org.coinductive.yfinance4s.models
+package org.coinductive.yfinance4s.models.internal
 
 import io.circe.{Decoder, Json}
 import io.circe.generic.semiauto.deriveDecoder

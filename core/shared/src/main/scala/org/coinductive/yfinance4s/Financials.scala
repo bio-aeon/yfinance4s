@@ -4,6 +4,7 @@ import cats.Functor
 import cats.syntax.functor.*
 import io.scalaland.chimney.dsl.*
 import org.coinductive.yfinance4s.models.*
+import org.coinductive.yfinance4s.models.internal.YFinanceFinancialsResult
 
 /** Algebra for financial statements data. */
 trait Financials[F[_]] {
