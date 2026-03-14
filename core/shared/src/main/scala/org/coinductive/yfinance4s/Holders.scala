@@ -31,7 +31,10 @@ trait Holders[F[_]] {
 
 private[yfinance4s] object Holders {
 
-  final class Impl[F[_]: Monad](
+  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Holders[F] =
+    new HoldersImpl(gateway, auth)
+
+  private final class HoldersImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Holders[F] {

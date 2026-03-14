@@ -37,7 +37,10 @@ trait Analysts[F[_]] {
 
 private[yfinance4s] object Analysts {
 
-  final class Impl[F[_]: Monad](
+  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Analysts[F] =
+    new AnalystsImpl(gateway, auth)
+
+  private final class AnalystsImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Analysts[F] {

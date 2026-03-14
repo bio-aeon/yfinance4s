@@ -8,7 +8,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 
 class SplitEventSpec extends FunSuite {
 
-  test("converts raw timestamp correctly") {
+  test("parses epoch timestamp into date") {
     val raw = SplitEventRaw(
       date = 1598832000L,
       numerator = 4,

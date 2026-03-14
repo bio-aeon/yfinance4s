@@ -24,7 +24,10 @@ trait Options[F[_]] {
 
 private[yfinance4s] object Options {
 
-  final class Impl[F[_]: Monad](
+  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Options[F] =
+    new OptionsImpl(gateway, auth)
+
+  private final class OptionsImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Options[F] {

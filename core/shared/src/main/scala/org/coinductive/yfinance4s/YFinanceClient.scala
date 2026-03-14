@@ -37,6 +37,9 @@ trait YFinanceClient[F[_]] {
   /** Analyst data (price targets, recommendations, estimates, etc.). */
   def analysts: Analysts[F]
 
+  /** Stock and fund screener. */
+  def screener: Screener[F]
+
   /** Searches Yahoo Finance for tickers, companies, and news.
     *
     * @param query
@@ -130,7 +133,7 @@ object YFinanceClient {
       gateway <- YFinanceGateway.resource[F](config.connectTimeout, config.readTimeout, config.retries)
       scrapper <- YFinanceScrapper.resource[F](config.connectTimeout, config.readTimeout, config.retries)
       auth <- YFinanceAuth.resource[F](config.connectTimeout, config.readTimeout, config.retries)
-    } yield new Impl(gateway, scrapper, auth)
+    } yield new YFinanceClientImpl(gateway, scrapper, auth)
 
   private def downloadMulti[F[_], A](
       tickers: NonEmptyList[Ticker],
@@ -142,17 +145,18 @@ object YFinanceClient {
       }
       .map(_.toMap)
 
-  private final class Impl[F[_]: Monad](
+  private final class YFinanceClientImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F],
       auth: YFinanceAuth[F]
   ) extends YFinanceClient[F] {
 
-    val charts: Charts[F] = new Charts.Impl(gateway, scrapper)
-    val options: Options[F] = new Options.Impl(gateway, auth)
-    val holders: Holders[F] = new Holders.Impl(gateway, auth)
-    val financials: Financials[F] = new Financials.Impl(gateway)
-    val analysts: Analysts[F] = new Analysts.Impl(gateway, auth)
+    val charts: Charts[F] = Charts(gateway, scrapper)
+    val options: Options[F] = Options(gateway, auth)
+    val holders: Holders[F] = Holders(gateway, auth)
+    val financials: Financials[F] = Financials(gateway)
+    val analysts: Analysts[F] = Analysts(gateway, auth)
+    val screener: Screener[F] = Screener(gateway, auth)
 
     def search(
         query: String,

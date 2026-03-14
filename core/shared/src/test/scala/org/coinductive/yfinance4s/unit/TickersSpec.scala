@@ -80,6 +80,11 @@ class TickersSpec extends FunSuite {
     val holders: Holders[Id] = stubHolders
     val financials: Financials[Id] = stubFinancials
     val analysts: Analysts[Id] = stubAnalysts
+    val screener: Screener[Id] = new Screener[Id] {
+      def screenEquities(query: ScreenerQuery, config: ScreenerConfig): ScreenerResult = ???
+      def screenFunds(query: ScreenerQuery, config: ScreenerConfig): ScreenerResult = ???
+      def screenPredefined(screen: PredefinedScreen, count: Int): ScreenerResult = ???
+    }
     def search(query: String, maxResults: Int, newsCount: Int, enableFuzzyQuery: Boolean): SearchResult = ???
   }
 

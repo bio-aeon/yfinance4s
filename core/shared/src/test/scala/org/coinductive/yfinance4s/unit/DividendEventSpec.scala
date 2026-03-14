@@ -8,7 +8,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 
 class DividendEventSpec extends FunSuite {
 
-  test("converts raw timestamp to ZonedDateTime") {
+  test("parses epoch timestamp into date") {
     val raw = DividendEventRaw(amount = 0.24, date = 1704067200L)
     val event = DividendEvent.fromRaw("1704067200", raw)
 

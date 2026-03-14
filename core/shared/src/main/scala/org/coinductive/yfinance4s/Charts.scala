@@ -61,7 +61,10 @@ trait Charts[F[_]] {
 
 private[yfinance4s] object Charts {
 
-  final class Impl[F[_]: Functor](
+  def apply[F[_]: Functor](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
+    new ChartsImpl(gateway, scrapper)
+
+  private final class ChartsImpl[F[_]: Functor](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F]
   ) extends Charts[F] {

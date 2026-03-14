@@ -102,7 +102,7 @@ class OptionsChainSpec extends CatsEffectSuite {
     }
   }
 
-  test("implied volatility is positive for all contracts") {
+  test("implied volatility is non-negative and mostly positive") {
     YFinanceClient.resource[IO](config).use { client =>
       client.options.getFullOptionChain(testTicker).map { fullChainOpt =>
         assert(fullChainOpt.isDefined)
@@ -112,11 +112,18 @@ class OptionsChainSpec extends CatsEffectSuite {
 
         assert(ivValues.nonEmpty, "Should have IV values")
 
-        // IV should be positive; very high values (>1000%) are possible for
-        // illiquid or far OTM options and are not necessarily data errors
+        // IV is non-negative; Yahoo returns 0.0 for illiquid contracts with
+        // no recent trades or bid/ask to compute from
         ivValues.foreach { iv =>
-          assert(iv > 0, s"IV should be positive: $iv")
+          assert(iv >= 0, s"IV should be non-negative: $iv")
         }
+
+        // Most contracts for a liquid stock like AAPL should have positive IV
+        val positiveCount = ivValues.count(_ > 0)
+        assert(
+          positiveCount > ivValues.size / 2,
+          s"Majority of contracts should have positive IV, got $positiveCount/${ivValues.size}"
+        )
       }
     }
   }

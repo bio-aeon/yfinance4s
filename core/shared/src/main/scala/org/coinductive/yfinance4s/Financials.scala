@@ -38,7 +38,10 @@ private[yfinance4s] object Financials {
 
   private val DefaultCurrency = "USD"
 
-  final class Impl[F[_]: Functor](gateway: YFinanceGateway[F]) extends Financials[F] {
+  def apply[F[_]: Functor](gateway: YFinanceGateway[F]): Financials[F] =
+    new FinancialsImpl(gateway)
+
+  private final class FinancialsImpl[F[_]: Functor](gateway: YFinanceGateway[F]) extends Financials[F] {
 
     def getFinancialStatements(
         ticker: Ticker,
