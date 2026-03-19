@@ -32,6 +32,10 @@ sealed trait YFinanceGateway[F[_]] {
   def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult]
 
   def search(query: String, quotesCount: Int, newsCount: Int, enableFuzzyQuery: Boolean): F[YFinanceSearchResult]
+
+  def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult]
+
+  def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult]
 }
 
 private object YFinanceGateway {
@@ -71,8 +75,18 @@ private object YFinanceGateway {
       uri"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
 
     private val SearchEndpoint = uri"https://query2.finance.yahoo.com/v1/finance/search"
+    private val ScreenerEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/screener"
+    private val PredefinedScreenerEndpoint =
+      uri"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
     private val DefaultQuotesQueryId = "tss_match_phrase_query"
     private val DefaultNewsQueryId = "news_cie_vespa"
+
+    private val ScreenerQueryParams = Map(
+      "corsDomain" -> "finance.yahoo.com",
+      "formatted" -> "false",
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
       val req =
@@ -264,6 +278,35 @@ private object YFinanceGateway {
       decode[YFinanceSearchResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse search response: ${e.getMessage}")),
+          F.pure
+        )
+
+    def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult] = {
+      val params = ScreenerQueryParams ++ Map("crumb" -> credentials.crumb)
+      val req = basicRequest
+        .post(ScreenerEndpoint.withParams(params))
+        .body(body)
+        .contentType("application/json")
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseScreenerContent)
+    }
+
+    def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult] = {
+      val params = ScreenerQueryParams ++ Map(
+        "scrIds" -> screenId,
+        "count" -> count.toString
+      )
+      val req = basicRequest.get(PredefinedScreenerEndpoint.withParams(params))
+
+      sendRequest(req, parseScreenerContent)
+    }
+
+    private def parseScreenerContent(content: String): F[YFinanceScreenerResult] =
+      decode[YFinanceScreenerResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse screener response: ${e.getMessage}")),
           F.pure
         )
 
