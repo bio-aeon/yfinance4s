@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.Monad
+import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.{Async, Concurrent, Resource}
 import cats.effect.syntax.concurrent.*
@@ -59,6 +59,33 @@ trait YFinanceClient[F[_]] {
       newsCount: Int = YFinanceClient.SearchDefaults.NewsCount,
       enableFuzzyQuery: Boolean = YFinanceClient.SearchDefaults.EnableFuzzyQuery
   ): F[SearchResult]
+
+  /** Looks up a Yahoo Finance ticker by ISIN.
+    *
+    * Validates the ISIN format (12-character alphanumeric with valid Luhn check digit), then queries Yahoo Finance's
+    * search API. Returns the best-matching ticker (highest relevance score), or None if no match is found.
+    *
+    * When a security is listed on multiple exchanges, returns the exchange Yahoo considers the primary listing. Use
+    * [[lookupAllByISIN]] to see all exchange listings.
+    *
+    * @param isin
+    *   A 12-character ISIN string (e.g., "US0378331005" for Apple)
+    * @return
+    *   The best-matching ticker, or None if no match is found. Raises an error in F if the ISIN format is invalid.
+    */
+  def lookupByISIN(isin: String): F[Option[Ticker]]
+
+  /** Looks up all Yahoo Finance tickers matching an ISIN.
+    *
+    * Useful when a security is listed on multiple exchanges (e.g., a European stock trading on both its home exchange
+    * and US ADR). Returns full quote search results so the caller can filter by exchange.
+    *
+    * @param isin
+    *   A 12-character ISIN string
+    * @return
+    *   All matching quote results (may be empty). Raises an error in F if the ISIN format is invalid.
+    */
+  def lookupAllByISIN(isin: String): F[List[QuoteSearchResult]]
 
   // --- Multi-Ticker Downloads (concrete with default implementations) ---
 
@@ -128,6 +155,12 @@ object YFinanceClient {
     val EnableFuzzyQuery = false
   }
 
+  private[yfinance4s] object IsinLookupDefaults {
+    val MaxResults = 8
+    val NewsCount = 0
+    val EnableFuzzyQuery = false
+  }
+
   def resource[F[_]: Async](config: YFinanceClientConfig): Resource[F, YFinanceClient[F]] =
     for {
       gateway <- YFinanceGateway.resource[F](config.connectTimeout, config.readTimeout, config.retries)
@@ -145,7 +178,7 @@ object YFinanceClient {
       }
       .map(_.toMap)
 
-  private final class YFinanceClientImpl[F[_]: Monad](
+  private final class YFinanceClientImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F],
       auth: YFinanceAuth[F]
@@ -165,6 +198,29 @@ object YFinanceClient {
         enableFuzzyQuery: Boolean
     ): F[SearchResult] =
       gateway.search(query, maxResults, newsCount, enableFuzzyQuery).map(mapSearchResult)
+
+    def lookupByISIN(isin: String): F[Option[Ticker]] =
+      lookupAllByISIN(isin).map(_.sorted.headOption.map(_.toTicker))
+
+    def lookupAllByISIN(isin: String): F[List[QuoteSearchResult]] =
+      validateIsin(isin).flatMap { validIsin =>
+        gateway
+          .search(
+            validIsin.value,
+            IsinLookupDefaults.MaxResults,
+            IsinLookupDefaults.NewsCount,
+            IsinLookupDefaults.EnableFuzzyQuery
+          )
+          .map(_.quotes.flatMap(mapSearchQuote))
+      }
+
+    private def validateIsin(isin: String): F[Isin] =
+      Isin
+        .validate(isin)
+        .fold(
+          error => MonadThrow[F].raiseError(new IllegalArgumentException(error)),
+          MonadThrow[F].pure
+        )
 
     // --- Search Mapping Helpers ---
 
