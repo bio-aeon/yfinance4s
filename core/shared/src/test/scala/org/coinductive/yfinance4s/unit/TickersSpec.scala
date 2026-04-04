@@ -86,6 +86,8 @@ class TickersSpec extends FunSuite {
       def screenPredefined(screen: PredefinedScreen, count: Int): ScreenerResult = ???
     }
     def search(query: String, maxResults: Int, newsCount: Int, enableFuzzyQuery: Boolean): SearchResult = ???
+    def lookupByISIN(isin: String): Option[Ticker] = ???
+    def lookupAllByISIN(isin: String): List[QuoteSearchResult] = ???
   }
 
   // --- Factory Tests ---
