@@ -85,6 +85,14 @@ class TickersSpec extends FunSuite {
       def screenFunds(query: ScreenerQuery, config: ScreenerConfig): ScreenerResult = ???
       def screenPredefined(screen: PredefinedScreen, count: Int): ScreenerResult = ???
     }
+    val sectors: Sectors[Id] = new Sectors[Id] {
+      def getSectorData(sectorKey: SectorKey): Option[SectorData] = ???
+      def getSectorOverview(sectorKey: SectorKey): Option[SectorOverview] = ???
+      def getTopETFs(sectorKey: SectorKey): List[SectorETF] = ???
+      def getTopMutualFunds(sectorKey: SectorKey): List[SectorMutualFund] = ???
+      def getIndustries(sectorKey: SectorKey): List[SectorIndustry] = ???
+      def getTopCompanies(sectorKey: SectorKey): List[TopCompany] = ???
+    }
     def search(query: String, maxResults: Int, newsCount: Int, enableFuzzyQuery: Boolean): SearchResult = ???
     def lookupByISIN(isin: String): Option[Ticker] = ???
     def lookupAllByISIN(isin: String): List[QuoteSearchResult] = ???

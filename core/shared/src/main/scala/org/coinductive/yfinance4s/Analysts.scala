@@ -160,14 +160,14 @@ private[yfinance4s] object Analysts {
 
     private def mapPriceTargets(raw: AnalystFinancialDataRaw): Option[AnalystPriceTargets] =
       for {
-        currentPrice <- raw.currentPrice.map(_.raw)
-        targetHigh <- raw.targetHighPrice.map(_.raw)
-        targetLow <- raw.targetLowPrice.map(_.raw)
-        targetMean <- raw.targetMeanPrice.map(_.raw)
-        targetMedian <- raw.targetMedianPrice.map(_.raw)
-        numAnalysts <- raw.numberOfAnalystOpinions.map(_.raw)
+        currentPrice <- raw.currentPrice.flatMap(_.raw)
+        targetHigh <- raw.targetHighPrice.flatMap(_.raw)
+        targetLow <- raw.targetLowPrice.flatMap(_.raw)
+        targetMean <- raw.targetMeanPrice.flatMap(_.raw)
+        targetMedian <- raw.targetMedianPrice.flatMap(_.raw)
+        numAnalysts <- raw.numberOfAnalystOpinions.flatMap(_.raw)
         recKey <- raw.recommendationKey
-        recMean <- raw.recommendationMean.map(_.raw)
+        recMean <- raw.recommendationMean.flatMap(_.raw)
       } yield AnalystPriceTargets(
         currentPrice = currentPrice,
         targetHigh = targetHigh,
@@ -249,10 +249,10 @@ private[yfinance4s] object Analysts {
       raw.period.map { period =>
         EpsRevisions(
           period = period,
-          upLast7Days = raw.epsRevisions.flatMap(_.upLast7days).map(_.raw),
-          upLast30Days = raw.epsRevisions.flatMap(_.upLast30days).map(_.raw),
-          downLast30Days = raw.epsRevisions.flatMap(_.downLast30days).map(_.raw),
-          downLast90Days = raw.epsRevisions.flatMap(_.downLast90days).map(_.raw)
+          upLast7Days = raw.epsRevisions.flatMap(_.upLast7days).flatMap(_.raw),
+          upLast30Days = raw.epsRevisions.flatMap(_.upLast30days).flatMap(_.raw),
+          downLast30Days = raw.epsRevisions.flatMap(_.downLast30days).flatMap(_.raw),
+          downLast90Days = raw.epsRevisions.flatMap(_.downLast90days).flatMap(_.raw)
         )
       }
 
