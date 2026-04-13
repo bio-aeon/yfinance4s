@@ -36,6 +36,8 @@ sealed trait YFinanceGateway[F[_]] {
   def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult]
 
   def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult]
+
+  def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult]
 }
 
 private object YFinanceGateway {
@@ -80,6 +82,15 @@ private object YFinanceGateway {
       uri"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
     private val DefaultQuotesQueryId = "tss_match_phrase_query"
     private val DefaultNewsQueryId = "news_cie_vespa"
+
+    private val SectorsEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/sectors/"
+
+    private val DomainQueryParams = Map(
+      "formatted" -> "true",
+      "withReturns" -> "true",
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
 
     private val ScreenerQueryParams = Map(
       "corsDomain" -> "finance.yahoo.com",
@@ -307,6 +318,25 @@ private object YFinanceGateway {
       decode[YFinanceScreenerResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse screener response: ${e.getMessage}")),
+          F.pure
+        )
+
+    def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult] = {
+      val req = basicRequest
+        .get(
+          SectorsEndpoint
+            .addPath(sectorKey.show)
+            .withParams(DomainQueryParams ++ Map("crumb" -> credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+      sendRequest(req, parseSectorContent)
+    }
+
+    private def parseSectorContent(content: String): F[YFinanceSectorResult] =
+      decode[YFinanceSectorResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse sector response: ${e.getMessage}")),
           F.pure
         )
 

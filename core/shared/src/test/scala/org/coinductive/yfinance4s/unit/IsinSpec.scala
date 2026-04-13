@@ -124,7 +124,7 @@ class IsinSpec extends FunSuite {
 
   // --- Show instance ---
 
-  test("Show instance renders ISIN value") {
+  test("displays ISIN as its string value") {
     assertEquals(Isin("US0378331005").show, "US0378331005")
   }
 }

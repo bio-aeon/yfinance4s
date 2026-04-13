@@ -39,14 +39,14 @@ private[yfinance4s] object AnalystQuoteData {
 // --- financialData (price targets subset) ---
 
 private[yfinance4s] final case class AnalystFinancialDataRaw(
-    targetHighPrice: Option[Value[Double]],
-    targetLowPrice: Option[Value[Double]],
-    targetMeanPrice: Option[Value[Double]],
-    targetMedianPrice: Option[Value[Double]],
-    currentPrice: Option[Value[Double]],
-    numberOfAnalystOpinions: Option[Value[Int]],
+    targetHighPrice: Option[Value[Option[Double]]],
+    targetLowPrice: Option[Value[Option[Double]]],
+    targetMeanPrice: Option[Value[Option[Double]]],
+    targetMedianPrice: Option[Value[Option[Double]]],
+    currentPrice: Option[Value[Option[Double]]],
+    numberOfAnalystOpinions: Option[Value[Option[Int]]],
     recommendationKey: Option[String],
-    recommendationMean: Option[Value[Double]]
+    recommendationMean: Option[Value[Option[Double]]]
 )
 
 private[yfinance4s] object AnalystFinancialDataRaw {
@@ -169,20 +169,14 @@ private[yfinance4s] object EpsTrendRaw {
 }
 
 private[yfinance4s] final case class EpsRevisionsRaw(
-    upLast7days: Option[Value[Int]],
-    upLast30days: Option[Value[Int]],
-    downLast30days: Option[Value[Int]],
-    downLast90days: Option[Value[Int]]
+    upLast7days: Option[Value[Option[Int]]],
+    upLast30days: Option[Value[Option[Int]]],
+    downLast30days: Option[Value[Option[Int]]],
+    downLast90days: Option[Value[Option[Int]]]
 )
 
 private[yfinance4s] object EpsRevisionsRaw {
-  implicit val decoder: Decoder[EpsRevisionsRaw] = (c: HCursor) =>
-    for {
-      up7 <- c.downField("upLast7days").as[Option[Value[Int]]].orElse(Right(None))
-      up30 <- c.downField("upLast30days").as[Option[Value[Int]]].orElse(Right(None))
-      down30 <- c.downField("downLast30days").as[Option[Value[Int]]].orElse(Right(None))
-      down90 <- c.downField("downLast90days").as[Option[Value[Int]]].orElse(Right(None))
-    } yield EpsRevisionsRaw(up7, up30, down30, down90)
+  implicit val decoder: Decoder[EpsRevisionsRaw] = deriveDecoder
 }
 
 // --- earningsHistory ---

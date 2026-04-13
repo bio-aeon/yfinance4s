@@ -40,6 +40,9 @@ trait YFinanceClient[F[_]] {
   /** Stock and fund screener. */
   def screener: Screener[F]
 
+  /** Sector data (overview, top ETFs/funds, industries). */
+  def sectors: Sectors[F]
+
   /** Searches Yahoo Finance for tickers, companies, and news.
     *
     * @param query
@@ -190,6 +193,7 @@ object YFinanceClient {
     val financials: Financials[F] = Financials(gateway)
     val analysts: Analysts[F] = Analysts(gateway, auth)
     val screener: Screener[F] = Screener(gateway, auth)
+    val sectors: Sectors[F] = Sectors(gateway, auth)
 
     def search(
         query: String,
