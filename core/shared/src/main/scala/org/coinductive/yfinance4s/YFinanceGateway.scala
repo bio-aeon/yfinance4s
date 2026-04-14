@@ -38,6 +38,8 @@ sealed trait YFinanceGateway[F[_]] {
   def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult]
 
   def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult]
+
+  def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult]
 }
 
 private object YFinanceGateway {
@@ -84,6 +86,7 @@ private object YFinanceGateway {
     private val DefaultNewsQueryId = "news_cie_vespa"
 
     private val SectorsEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/sectors/"
+    private val IndustriesEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/industries/"
 
     private val DomainQueryParams = Map(
       "formatted" -> "true",
@@ -337,6 +340,25 @@ private object YFinanceGateway {
       decode[YFinanceSectorResult](content)
         .fold(
           e => F.raiseError(new Exception(s"Failed to parse sector response: ${e.getMessage}")),
+          F.pure
+        )
+
+    def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult] = {
+      val req = basicRequest
+        .get(
+          IndustriesEndpoint
+            .addPath(industryKey.show)
+            .withParams(DomainQueryParams ++ Map("crumb" -> credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+      sendRequest(req, parseIndustryContent)
+    }
+
+    private def parseIndustryContent(content: String): F[YFinanceIndustryResult] =
+      decode[YFinanceIndustryResult](content)
+        .fold(
+          e => F.raiseError(new Exception(s"Failed to parse industry response: ${e.getMessage}")),
           F.pure
         )
 

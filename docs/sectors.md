@@ -34,6 +34,8 @@ clientResource.use { client =>
 }
 ```
 
+For per-industry data (overview, top performers, top growth companies), use the `industries` algebra - see [industries.md](./industries.md).
+
 ## Top Companies
 
 ```scala

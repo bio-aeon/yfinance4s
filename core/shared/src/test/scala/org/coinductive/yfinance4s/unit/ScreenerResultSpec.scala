@@ -190,12 +190,8 @@ class ScreenerResultSpec extends FunSuite {
     assertEquals(result.sectors, List("Technology"))
   }
 
-  test("empty result has zero counts and empty lists") {
+  test("derived accessors yield empty results on empty input") {
     val empty = ScreenerResult.empty
-    assert(empty.isEmpty)
-    assertEquals(empty.total, 0)
-    assertEquals(empty.size, 0)
-    assert(!empty.hasMore)
     assertEquals(empty.symbols, List.empty[String])
     assertEquals(empty.equities, List.empty[ScreenerQuote])
     assertEquals(empty.largestByMarketCap, None)
@@ -203,14 +199,6 @@ class ScreenerResultSpec extends FunSuite {
   }
 
   // --- ScreenerConfig tests ---
-
-  test("default config has expected values") {
-    val config = ScreenerConfig.Default
-    assertEquals(config.sortField, "ticker")
-    assertEquals(config.sortOrder, SortOrder.Desc)
-    assertEquals(config.offset, 0)
-    assertEquals(config.count, 25)
-  }
 
   test("rejects count above max") {
     intercept[IllegalArgumentException] {

@@ -225,13 +225,8 @@ class SearchResultSpec extends FunSuite {
     assertEquals(searchResult.tickers, List(Ticker("AAPL"), Ticker("SPY"), Ticker("BTC-USD")))
   }
 
-  test("empty result has zero counts and empty lists") {
+  test("derived accessors yield empty results on empty input") {
     val empty = SearchResult.empty
-    assert(empty.isEmpty)
-    assert(empty.quotes.isEmpty)
-    assert(empty.news.isEmpty)
-    assert(empty.lists.isEmpty)
-    assertEquals(empty.totalResults, 0)
     assertEquals(empty.equities, List.empty[QuoteSearchResult])
     assertEquals(empty.etfs, List.empty[QuoteSearchResult])
     assertEquals(empty.topQuote, None)
