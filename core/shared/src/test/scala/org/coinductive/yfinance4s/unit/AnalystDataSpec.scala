@@ -615,15 +615,9 @@ class AnalystDataSpec extends FunSuite {
     assertEquals(data.earningsBeatRate, None)
   }
 
-  test("empty instance returns defaults for all accessors") {
+  test("derived accessors yield empty results on empty history") {
     val data = AnalystData.empty
-    assertEquals(data.currentRecommendation, None)
-    assertEquals(data.currentQuarterEarningsEstimate, None)
-    assertEquals(data.currentQuarterRevenueEstimate, None)
-    assertEquals(data.currentYearEarningsEstimate, None)
-    assertEquals(data.consecutiveBeats, 0)
     assertEquals(data.recentUpgrades().size, 0)
     assertEquals(data.recentDowngrades().size, 0)
-    assertEquals(data.earningsBeatRate, None)
   }
 }

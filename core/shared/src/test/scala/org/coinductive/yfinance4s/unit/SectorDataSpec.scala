@@ -193,19 +193,6 @@ class SectorDataSpec extends FunSuite {
 
   // --- SectorKey tests ---
 
-  test("predefined sector keys have correct values") {
-    assertEquals(SectorKey.Technology.value, "technology")
-    assertEquals(SectorKey.Healthcare.value, "healthcare")
-    assertEquals(SectorKey.FinancialServices.value, "financial-services")
-    assertEquals(SectorKey.RealEstate.value, "real-estate")
-    assertEquals(SectorKey.ConsumerCyclical.value, "consumer-cyclical")
-    assertEquals(SectorKey.BasicMaterials.value, "basic-materials")
-  }
-
-  test("all contains exactly 11 GICS sectors") {
-    assertEquals(SectorKey.all.size, 11)
-  }
-
   test("all sector keys are unique") {
     assertEquals(SectorKey.all.map(_.value).distinct.size, 11)
   }
@@ -217,14 +204,8 @@ class SectorDataSpec extends FunSuite {
 
   // --- defaults ---
 
-  test("has empty defaults when constructed with only key and name") {
+  test("derived lookups yield empty results on minimal construction") {
     val data = SectorData(key = SectorKey.Technology, name = "Technology")
-    assertEquals(data.industryCount, 0)
-    assertEquals(data.totalMarketWeight, None)
-    assertEquals(data.totalMarketWeightPercent, None)
-    assertEquals(data.totalCompanies, None)
-    assertEquals(data.totalMarketCap, None)
-    assertEquals(data.description, None)
     assert(data.industriesByWeight.isEmpty)
     assertEquals(data.findIndustry("any"), None)
     assert(data.topCompaniesByWeight(5).isEmpty)

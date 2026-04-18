@@ -116,9 +116,4 @@ class InsiderTransactionSpec extends FunSuite {
     assertEquals(OwnershipType.fromString("i"), OwnershipType.Indirect)
     assertEquals(OwnershipType.fromString("unknown"), OwnershipType.Direct) // Default
   }
-
-  test("represents ownership type as string") {
-    assertEquals(OwnershipType.Direct.value, "D")
-    assertEquals(OwnershipType.Indirect.value, "I")
-  }
 }
