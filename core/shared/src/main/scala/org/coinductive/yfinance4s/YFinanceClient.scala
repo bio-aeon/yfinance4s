@@ -46,6 +46,9 @@ trait YFinanceClient[F[_]] {
   /** Industry data (overview, top companies, top performers, top growth). */
   def industries: Industries[F]
 
+  /** Market data (region summary, status, trending tickers). */
+  def markets: Markets[F]
+
   /** Searches Yahoo Finance for tickers, companies, and news.
     *
     * @param query
@@ -198,6 +201,7 @@ object YFinanceClient {
     val screener: Screener[F] = Screener(gateway, auth)
     val sectors: Sectors[F] = Sectors(gateway, auth)
     val industries: Industries[F] = Industries(gateway, auth)
+    val markets: Markets[F] = Markets(gateway, auth)
 
     def search(
         query: String,

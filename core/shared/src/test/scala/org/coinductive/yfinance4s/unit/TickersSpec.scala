@@ -102,6 +102,12 @@ class TickersSpec extends FunSuite {
       def getTopGrowthCompanies(industryKey: IndustryKey): List[TopGrowthCompany] = ???
       def getResearchReports(industryKey: IndustryKey): List[ResearchReport] = ???
     }
+    val markets: Markets[Id] = new Markets[Id] {
+      def getSummary(region: MarketRegion): MarketSummary = ???
+      def getStatus(region: MarketRegion): MarketStatus = ???
+      def getTrending(region: MarketRegion, count: Int): List[TrendingTicker] = ???
+      def getMarketSnapshot(region: MarketRegion): MarketSnapshot = ???
+    }
     def search(query: String, maxResults: Int, newsCount: Int, enableFuzzyQuery: Boolean): SearchResult = ???
     def lookupByISIN(isin: String): Option[Ticker] = ???
     def lookupAllByISIN(isin: String): List[QuoteSearchResult] = ???
