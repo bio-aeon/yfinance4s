@@ -2,7 +2,6 @@ package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
-import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.internal.*
 import retry.{RetryPolicies, RetryPolicy, Sleep}
@@ -40,6 +39,16 @@ sealed trait YFinanceGateway[F[_]] {
   def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult]
 
   def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult]
+
+  def getMarketSummary(region: MarketRegion, credentials: YFinanceCredentials): F[YFinanceMarketSummaryResult]
+
+  def getMarketStatus(region: MarketRegion, credentials: YFinanceCredentials): F[YFinanceMarketStatusResult]
+
+  def getMarketTrending(
+      region: MarketRegion,
+      count: Int,
+      credentials: YFinanceCredentials
+  ): F[YFinanceTrendingResult]
 }
 
 private object YFinanceGateway {
@@ -88,6 +97,29 @@ private object YFinanceGateway {
     private val SectorsEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/sectors/"
     private val IndustriesEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/industries/"
 
+    private val MarketSummaryEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/quote/marketSummary"
+    private val MarketTimeEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/markettime"
+    private val TrendingEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/trending/"
+
+    private val MarketSummaryFields = List(
+      "shortName",
+      "fullExchangeName",
+      "exchange",
+      "currency",
+      "marketState",
+      "exchangeTimezoneName",
+      "regularMarketPrice",
+      "regularMarketChange",
+      "regularMarketChangePercent",
+      "regularMarketTime",
+      "previousClose"
+    ).mkString(",")
+
+    private val MarketBaseParams = Map(
+      "formatted" -> "true",
+      "lang" -> "en-US"
+    )
+
     private val DomainQueryParams = Map(
       "formatted" -> "true",
       "withReturns" -> "true",
@@ -110,7 +142,7 @@ private object YFinanceGateway {
             .withParams(("interval", interval.show), ("range", range.show), ("events", "div,split"))
         )
 
-      sendRequest(req, parseChartContent)
+      sendRequest(req, parseAs[YFinanceQueryResult]("chart"))
     }
 
     def getChart(
@@ -131,7 +163,7 @@ private object YFinanceGateway {
             )
         )
 
-      sendRequest(req, parseChartContent)
+      sendRequest(req, parseAs[YFinanceQueryResult]("chart"))
     }
 
     def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
@@ -144,7 +176,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseOptionsContent)
+      sendRequest(req, parseAs[YFinanceOptionsResult]("options"))
     }
 
     def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
@@ -157,7 +189,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseOptionsContent)
+      sendRequest(req, parseAs[YFinanceOptionsResult]("options"))
     }
 
     def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult] = {
@@ -174,31 +206,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseHoldersContent)
-    }
-
-    private def parseChartContent(content: String): F[YFinanceQueryResult] = {
-      decode[YFinanceQueryResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse chart response: ${e.getMessage}")),
-          F.pure
-        )
-    }
-
-    private def parseOptionsContent(content: String): F[YFinanceOptionsResult] = {
-      decode[YFinanceOptionsResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse options response: ${e.getMessage}")),
-          F.pure
-        )
-    }
-
-    private def parseHoldersContent(content: String): F[YFinanceHoldersResult] = {
-      decode[YFinanceHoldersResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse holders response: ${e.getMessage}")),
-          F.pure
-        )
+      sendRequest(req, parseAs[YFinanceHoldersResult]("holders"))
     }
 
     def getFinancials(
@@ -228,15 +236,8 @@ private object YFinanceGateway {
           )
       )
 
-      sendRequest(req, parseFinancialsContent)
+      sendRequest(req, parseAs[YFinanceFinancialsResult]("financials"))
     }
-
-    private def parseFinancialsContent(content: String): F[YFinanceFinancialsResult] =
-      decode[YFinanceFinancialsResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse financials response: ${e.getMessage}")),
-          F.pure
-        )
 
     def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult] = {
       val req = basicRequest
@@ -252,15 +253,8 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAnalystContent)
+      sendRequest(req, parseAs[YFinanceAnalystResult]("analyst"))
     }
-
-    private def parseAnalystContent(content: String): F[YFinanceAnalystResult] =
-      decode[YFinanceAnalystResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse analyst response: ${e.getMessage}")),
-          F.pure
-        )
 
     def search(
         query: String,
@@ -285,15 +279,8 @@ private object YFinanceGateway {
         )
       )
 
-      sendRequest(req, parseSearchContent)
+      sendRequest(req, parseAs[YFinanceSearchResult]("search"))
     }
-
-    private def parseSearchContent(content: String): F[YFinanceSearchResult] =
-      decode[YFinanceSearchResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse search response: ${e.getMessage}")),
-          F.pure
-        )
 
     def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult] = {
       val params = ScreenerQueryParams ++ Map("crumb" -> credentials.crumb)
@@ -304,7 +291,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseScreenerContent)
+      sendRequest(req, parseAs[YFinanceScreenerResult]("screener"))
     }
 
     def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult] = {
@@ -314,15 +301,8 @@ private object YFinanceGateway {
       )
       val req = basicRequest.get(PredefinedScreenerEndpoint.withParams(params))
 
-      sendRequest(req, parseScreenerContent)
+      sendRequest(req, parseAs[YFinanceScreenerResult]("screener"))
     }
-
-    private def parseScreenerContent(content: String): F[YFinanceScreenerResult] =
-      decode[YFinanceScreenerResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse screener response: ${e.getMessage}")),
-          F.pure
-        )
 
     def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult] = {
       val req = basicRequest
@@ -333,15 +313,8 @@ private object YFinanceGateway {
         )
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
-      sendRequest(req, parseSectorContent)
+      sendRequest(req, parseAs[YFinanceSectorResult]("sector"))
     }
-
-    private def parseSectorContent(content: String): F[YFinanceSectorResult] =
-      decode[YFinanceSectorResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse sector response: ${e.getMessage}")),
-          F.pure
-        )
 
     def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult] = {
       val req = basicRequest
@@ -352,15 +325,59 @@ private object YFinanceGateway {
         )
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
-      sendRequest(req, parseIndustryContent)
+      sendRequest(req, parseAs[YFinanceIndustryResult]("industry"))
     }
 
-    private def parseIndustryContent(content: String): F[YFinanceIndustryResult] =
-      decode[YFinanceIndustryResult](content)
-        .fold(
-          e => F.raiseError(new Exception(s"Failed to parse industry response: ${e.getMessage}")),
-          F.pure
-        )
+    def getMarketSummary(
+        region: MarketRegion,
+        credentials: YFinanceCredentials
+    ): F[YFinanceMarketSummaryResult] = {
+      val params = MarketBaseParams ++ Map(
+        "fields" -> MarketSummaryFields,
+        "market" -> region.show,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(MarketSummaryEndpoint.withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceMarketSummaryResult]("market summary"))
+    }
+
+    def getMarketStatus(
+        region: MarketRegion,
+        credentials: YFinanceCredentials
+    ): F[YFinanceMarketStatusResult] = {
+      val params = MarketBaseParams ++ Map(
+        "key" -> "finance",
+        "market" -> region.show,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(MarketTimeEndpoint.withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceMarketStatusResult]("market status"))
+    }
+
+    def getMarketTrending(
+        region: MarketRegion,
+        count: Int,
+        credentials: YFinanceCredentials
+    ): F[YFinanceTrendingResult] = {
+      val params = MarketBaseParams ++ Map(
+        "count" -> count.toString,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(TrendingEndpoint.addPath(region.show).withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceTrendingResult]("trending"))
+    }
 
   }
 

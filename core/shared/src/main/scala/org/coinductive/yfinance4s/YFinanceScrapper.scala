@@ -5,7 +5,6 @@ import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
-import io.circe.parser.decode
 import org.coinductive.yfinance4s.html.PlatformHtmlParser
 import org.coinductive.yfinance4s.models.Ticker
 import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult
@@ -70,16 +69,8 @@ private object YFinanceScrapper {
 
       (maybeSummary, maybeFundamentals).traverseN { case (summaryStr, fundamentalsStr) =>
         for {
-          summary <- decode[YFinanceQuoteResult.Summary](summaryStr)
-            .fold(
-              e => F.raiseError(new Exception(s"Illegible quote summary: ${e.getMessage}")),
-              F.pure
-            )
-          fundamentals <- decode[YFinanceQuoteResult.Fundamentals](fundamentalsStr)
-            .fold(
-              e => F.raiseError(new Exception(s"Illegible quote fundamentals: ${e.getMessage}")),
-              F.pure
-            )
+          summary <- parseAs[YFinanceQuoteResult.Summary]("quote summary")(summaryStr)
+          fundamentals <- parseAs[YFinanceQuoteResult.Fundamentals]("quote fundamentals")(fundamentalsStr)
         } yield YFinanceQuoteResult(summary, fundamentals)
       }
     }
