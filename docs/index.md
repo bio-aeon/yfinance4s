@@ -14,6 +14,7 @@ YFinance4s is an effectful Yahoo Finance client for Scala, built on Cats Effect 
 - **Sector Data**: Sector overview, top ETFs, mutual funds, industries, and top companies for all 11 GICS sectors
 - **Industry Data**: Per-industry overview, top companies, top performers (YTD return, implied upside), and top growth companies
 - **Market Data**: Region-level market summary (headline indices), trading status with open/close times, and trending tickers
+- **Earnings Calendar**: Market-wide upcoming earnings ranked by market cap, and per-ticker historical/upcoming earnings timelines
 - **Search**: Ticker/company/news search with fuzzy matching
 - **Stock Screener**: Custom and predefined equity/fund screens
 - **ISIN Lookup**: Resolve ISINs to Yahoo Finance tickers with ISO 6166 validation
@@ -75,6 +76,7 @@ client.analysts    // price targets, recommendations, estimates
 client.sectors     // sector overview, industries, top ETFs/funds
 client.industries  // industry overview, top performers, top growth companies
 client.markets     // region summary, market status, trending tickers
+client.calendars   // earnings calendar and per-ticker earnings timelines
 client.screener    // custom and predefined stock/fund screens
 client.search(q)   // ticker and news search
 ```

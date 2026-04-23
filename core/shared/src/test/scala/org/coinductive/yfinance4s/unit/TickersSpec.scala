@@ -108,6 +108,10 @@ class TickersSpec extends FunSuite {
       def getTrending(region: MarketRegion, count: Int): List[TrendingTicker] = ???
       def getMarketSnapshot(region: MarketRegion): MarketSnapshot = ???
     }
+    val calendars: Calendars[Id] = new Calendars[Id] {
+      def getEarningsCalendar(start: LocalDate, end: LocalDate, config: CalendarConfig): List[EarningsEvent] = ???
+      def getEarningsDates(ticker: Ticker, limit: Int, offset: Int): List[EarningsDate] = ???
+    }
     def search(query: String, maxResults: Int, newsCount: Int, enableFuzzyQuery: Boolean): SearchResult = ???
     def lookupByISIN(isin: String): Option[Ticker] = ???
     def lookupAllByISIN(isin: String): List[QuoteSearchResult] = ???
