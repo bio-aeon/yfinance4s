@@ -1,13 +1,15 @@
 package org.coinductive.yfinance4s.models
 
-/** Sort order for screener results. */
-sealed trait SortOrder {
-  private[yfinance4s] def apiValue: String
-}
+import enumeratum.*
 
-object SortOrder {
-  case object Asc extends SortOrder { val apiValue = "ASC" }
-  case object Desc extends SortOrder { val apiValue = "DESC" }
+/** Sort order for screener results. */
+sealed abstract class SortOrder(private[yfinance4s] val apiValue: String) extends EnumEntry
+
+object SortOrder extends Enum[SortOrder] {
+  case object Asc extends SortOrder("ASC")
+  case object Desc extends SortOrder("DESC")
+
+  val values: IndexedSeq[SortOrder] = findValues
 }
 
 /** Configuration for a custom screener query.

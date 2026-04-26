@@ -1,21 +1,20 @@
 package org.coinductive.yfinance4s.models
 
+import enumeratum.values.{StringEnum, StringEnumEntry}
+
 import java.time.LocalDate
 
 /** Type of insider ownership. */
-sealed trait OwnershipType {
-  def value: String
-}
+sealed abstract class OwnershipType(val value: String) extends StringEnumEntry
 
-object OwnershipType {
-  case object Direct extends OwnershipType { val value = "D" }
-  case object Indirect extends OwnershipType { val value = "I" }
+object OwnershipType extends StringEnum[OwnershipType] {
+  case object Direct extends OwnershipType("D")
+  case object Indirect extends OwnershipType("I")
 
-  def fromString(s: String): OwnershipType = s.toUpperCase match {
-    case "D" => Direct
-    case "I" => Indirect
-    case _   => Direct // Default to direct if unknown
-  }
+  val values: IndexedSeq[OwnershipType] = findValues
+
+  def fromString(s: String): OwnershipType =
+    withValueOpt(s.toUpperCase).getOrElse(Direct)
 }
 
 /** An insider transaction (buy or sell).

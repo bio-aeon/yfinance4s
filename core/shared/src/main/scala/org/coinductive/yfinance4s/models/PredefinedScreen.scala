@@ -1,5 +1,7 @@
 package org.coinductive.yfinance4s.models
 
+import enumeratum.*
+
 /** A named predefined screener query available on Yahoo Finance.
   *
   * These correspond to Yahoo's built-in screens accessible via the `/v1/finance/screener/predefined/saved` endpoint.
@@ -7,9 +9,9 @@ package org.coinductive.yfinance4s.models
   * @param screenId
   *   The Yahoo API identifier (e.g., `"day_gainers"`)
   */
-sealed abstract class PredefinedScreen(val screenId: String)
+sealed abstract class PredefinedScreen(val screenId: String) extends EnumEntry
 
-object PredefinedScreen {
+object PredefinedScreen extends Enum[PredefinedScreen] {
   case object AggressiveSmallCaps extends PredefinedScreen("aggressive_small_caps")
   case object DayGainers extends PredefinedScreen("day_gainers")
   case object DayLosers extends PredefinedScreen("day_losers")
@@ -27,23 +29,7 @@ object PredefinedScreen {
   case object TopMutualFunds extends PredefinedScreen("top_mutual_funds")
 
   /** All predefined screens. */
-  val values: List[PredefinedScreen] = List(
-    AggressiveSmallCaps,
-    DayGainers,
-    DayLosers,
-    GrowthTechnologyStocks,
-    MostActives,
-    MostShortedStocks,
-    SmallCapGainers,
-    UndervaluedGrowthStocks,
-    UndervaluedLargeCaps,
-    ConservativeForeignFunds,
-    HighYieldBond,
-    PortfolioAnchors,
-    SolidLargeGrowthFunds,
-    SolidMidcapGrowthFunds,
-    TopMutualFunds
-  )
+  val values: IndexedSeq[PredefinedScreen] = findValues
 
   /** Equity-focused predefined screens. */
   val equityScreens: List[PredefinedScreen] = List(
