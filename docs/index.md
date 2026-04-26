@@ -19,6 +19,7 @@ YFinance4s is an effectful Yahoo Finance client for Scala, built on Cats Effect 
 - **Stock Screener**: Custom and predefined equity/fund screens
 - **ISIN Lookup**: Resolve ISINs to Yahoo Finance tickers with ISO 6166 validation
 - **Batch Operations**: Parallel multi-ticker fetches with configurable concurrency and error-tolerant modes
+- **Rate Limiting**: Built-in outbound request pacing (interval-based, configurable, on by default) to avoid Yahoo throttling
 
 ## Platform Support
 
@@ -62,6 +63,30 @@ clientResource.use { client =>
   }
 }
 ```
+
+## Rate Limiting
+
+Outbound requests to Yahoo Finance are paced by default to avoid 429 ("Too Many Requests") responses. The default
+allows 2 requests per second; a single limiter is shared across all components of a client instance, so the
+configured rate is the *combined* outbound rate (not a per-component multiplier).
+
+Configure via `YFinanceClientConfig.rateLimit`:
+
+```scala
+import org.coinductive.yfinance4s.models.RateLimitConfig
+
+// Custom rate for an aggressive backfill
+val backfillConfig = config.copy(
+  rateLimit = RateLimitConfig.Enabled(maxRequestsPerSecond = 5)
+)
+
+// Disable entirely (e.g. tests, or callers with their own throttle)
+val unthrottledConfig = config.copy(rateLimit = RateLimitConfig.Disabled)
+```
+
+Pacing is interval-based: requests are spaced no closer than `1.second / maxRequestsPerSecond` apart, with no burst
+capacity. A long idle period does not earn credit toward subsequent bursts. Concurrency (e.g. `parTraverseN`) and
+pacing compose independently - both limits apply.
 
 ## Client API Overview
 

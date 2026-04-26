@@ -82,18 +82,20 @@ private object YFinanceAuth {
   def resource[F[_]: Async](
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
-      retries: Int
+      retries: Int,
+      rateLimiter: RateLimiter[F]
   ): Resource[F, YFinanceAuth[F]] =
     PlatformSttpBackend.resource[F](connectTimeout, readTimeout).evalMap { backend =>
       val retryPolicy = RetryPolicies.limitRetries[F](retries)
       Ref.of[F, Option[YFinanceCredentials]](None).map { credentialsRef =>
-        new YFinanceAuthImpl[F](backend, retryPolicy, credentialsRef)
+        new YFinanceAuthImpl[F](backend, retryPolicy, rateLimiter, credentialsRef)
       }
     }
 
   private final class YFinanceAuthImpl[F[_]](
       sttpBackend: SttpBackend[F, Any],
       retryPolicy: RetryPolicy[F],
+      rateLimiter: RateLimiter[F],
       credentialsRef: Ref[F, Option[YFinanceCredentials]]
   )(implicit F: Async[F], S: Sleep[F])
       extends YFinanceAuth[F] {
@@ -121,7 +123,7 @@ private object YFinanceAuth {
 
       retry
         .retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-          request.send(sttpBackend)
+          rateLimiter.acquire(request.send(sttpBackend))
         }
         .map { response =>
           response.headers
@@ -143,7 +145,7 @@ private object YFinanceAuth {
 
       retry
         .retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-          request.send(sttpBackend)
+          rateLimiter.acquire(request.send(sttpBackend))
         }
         .flatMap { response =>
           response.body match {

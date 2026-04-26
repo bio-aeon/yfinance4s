@@ -175,9 +175,10 @@ object YFinanceClient {
 
   def resource[F[_]: Async](config: YFinanceClientConfig): Resource[F, YFinanceClient[F]] =
     for {
-      gateway <- YFinanceGateway.resource[F](config.connectTimeout, config.readTimeout, config.retries)
-      scrapper <- YFinanceScrapper.resource[F](config.connectTimeout, config.readTimeout, config.retries)
-      auth <- YFinanceAuth.resource[F](config.connectTimeout, config.readTimeout, config.retries)
+      rateLimiter <- RateLimiter.resource[F](config.rateLimit)
+      gateway <- YFinanceGateway.resource[F](config.connectTimeout, config.readTimeout, config.retries, rateLimiter)
+      scrapper <- YFinanceScrapper.resource[F](config.connectTimeout, config.readTimeout, config.retries, rateLimiter)
+      auth <- YFinanceAuth.resource[F](config.connectTimeout, config.readTimeout, config.retries, rateLimiter)
     } yield new YFinanceClientImpl(gateway, scrapper, auth)
 
   private def downloadMulti[F[_], A](

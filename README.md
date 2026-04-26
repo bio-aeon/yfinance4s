@@ -19,6 +19,7 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Stock Screener**: Custom and predefined equity/fund screens
 - **ISIN Lookup**: Resolve ISINs to Yahoo Finance tickers with ISO 6166 validation
 - **Batch Operations**: Parallel multi-ticker fetches with configurable concurrency and error-tolerant modes
+- **Rate Limiting**: Built-in outbound request pacing (interval-based, configurable, on by default) to avoid Yahoo throttling
 - **Purely Functional**: Built on Cats Effect 3 with `Resource`-based lifecycle management
 - **Cross-Platform**: JVM and Scala.js
 - **Scala 2.13 & Scala 3**

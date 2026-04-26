@@ -58,18 +58,24 @@ private object YFinanceGateway {
   def resource[F[_]: Async](
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
-      retries: Int
+      retries: Int,
+      rateLimiter: RateLimiter[F]
   ): Resource[F, YFinanceGateway[F]] =
-    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _))
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _, rateLimiter))
 
-  def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): YFinanceGateway[F] = {
+  def apply[F[_]: Sync: Sleep](
+      retries: Int,
+      sttpBackend: SttpBackend[F, Any],
+      rateLimiter: RateLimiter[F]
+  ): YFinanceGateway[F] = {
     val retryPolicy = RetryPolicies.limitRetries(retries)
-    new YFinanceGatewayImpl[F](sttpBackend, retryPolicy)
+    new YFinanceGatewayImpl[F](sttpBackend, retryPolicy, rateLimiter)
   }
 
   private final class YFinanceGatewayImpl[F[_]](
       protected val sttpBackend: SttpBackend[F, Any],
-      protected val retryPolicy: RetryPolicy[F]
+      protected val retryPolicy: RetryPolicy[F],
+      protected val rateLimiter: RateLimiter[F]
   )(implicit
       protected val F: Sync[F],
       protected val S: Sleep[F]

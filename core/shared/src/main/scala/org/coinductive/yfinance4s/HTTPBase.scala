@@ -15,13 +15,14 @@ trait HTTPBase[F[_]] {
 
   protected val sttpBackend: SttpBackend[F, Any]
   protected val retryPolicy: RetryPolicy[F]
+  protected val rateLimiter: RateLimiter[F]
 
   protected def sendRequest[A](
       request: RequestT[Identity, Either[String, String], Any],
       parseContent: String => F[A]
   ): F[A] = {
     retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-      request.send(sttpBackend)
+      rateLimiter.acquire(request.send(sttpBackend))
     }.flatMap(parseResponse[A](_, parseContent))
   }
 
