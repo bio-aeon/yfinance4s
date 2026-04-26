@@ -14,6 +14,7 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Sector Data**: Sector overview, top ETFs, mutual funds, industries, and top companies for all 11 GICS sectors
 - **Industry Data**: Per-industry overview, top companies, top performers (YTD return, implied upside), and top growth companies
 - **Market Data**: Region-level market summary (headline indices), trading status with open/close times, and trending tickers
+- **Earnings Calendar**: Market-wide upcoming earnings ranked by market cap, and per-ticker historical/upcoming earnings timelines
 - **Search**: Ticker/company/news search with fuzzy matching
 - **Stock Screener**: Custom and predefined equity/fund screens
 - **ISIN Lookup**: Resolve ISINs to Yahoo Finance tickers with ISO 6166 validation
@@ -64,6 +65,7 @@ YFinanceClient.resource[IO](config).use { client =>
 | [Sector Data](docs/sectors.md) | Sector overview, industries, top ETFs/funds |
 | [Industry Data](docs/industries.md) | Industry overview, top companies, performers, growth |
 | [Market Data](docs/markets.md) | Region summary, market status, trending tickers |
+| [Earnings Calendar](docs/calendars.md) | Market-wide and per-ticker earnings events |
 | [Search & ISIN](docs/search.md) | Ticker search and ISIN lookup |
 | [Screener](docs/screener.md) | Custom and predefined stock/fund screens |
 | [Batch Operations](docs/batch-operations.md) | Multi-ticker parallel fetches |

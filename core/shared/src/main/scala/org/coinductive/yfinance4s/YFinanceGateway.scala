@@ -49,6 +49,8 @@ sealed trait YFinanceGateway[F[_]] {
       count: Int,
       credentials: YFinanceCredentials
   ): F[YFinanceTrendingResult]
+
+  def postVisualization(body: String, credentials: YFinanceCredentials): F[YFinanceCalendarResult]
 }
 
 private object YFinanceGateway {
@@ -100,6 +102,13 @@ private object YFinanceGateway {
     private val MarketSummaryEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/quote/marketSummary"
     private val MarketTimeEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/markettime"
     private val TrendingEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/trending/"
+
+    private val VisualizationEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/visualization"
+
+    private val VisualizationQueryParams = Map(
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
 
     private val MarketSummaryFields = List(
       "shortName",
@@ -377,6 +386,18 @@ private object YFinanceGateway {
         .header("Cookie", credentials.cookies.mkString("; "))
 
       sendRequest(req, parseAs[YFinanceTrendingResult]("trending"))
+    }
+
+    def postVisualization(body: String, credentials: YFinanceCredentials): F[YFinanceCalendarResult] = {
+      val params = VisualizationQueryParams ++ Map("crumb" -> credentials.crumb)
+      val req = basicRequest
+        .post(VisualizationEndpoint.withParams(params))
+        .body(body)
+        .contentType("application/json")
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceCalendarResult]("calendar"))
     }
 
   }

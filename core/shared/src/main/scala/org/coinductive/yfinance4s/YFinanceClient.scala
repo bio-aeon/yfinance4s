@@ -49,6 +49,9 @@ trait YFinanceClient[F[_]] {
   /** Market data (region summary, status, trending tickers). */
   def markets: Markets[F]
 
+  /** Calendar data (earnings events; IPO / economic / splits in future phases). */
+  def calendars: Calendars[F]
+
   /** Searches Yahoo Finance for tickers, companies, and news.
     *
     * @param query
@@ -202,6 +205,7 @@ object YFinanceClient {
     val sectors: Sectors[F] = Sectors(gateway, auth)
     val industries: Industries[F] = Industries(gateway, auth)
     val markets: Markets[F] = Markets(gateway, auth)
+    val calendars: Calendars[F] = Calendars(gateway, auth)
 
     def search(
         query: String,
