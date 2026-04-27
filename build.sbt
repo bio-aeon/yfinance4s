@@ -10,8 +10,8 @@ ThisBuild / scalaVersion := Scala2
 
 ThisBuild / testFrameworks += new TestFramework("munit.Framework")
 
-val catsV = "2.9.0"
-val catsEffectV = "3.4.8"
+val catsV = "2.11.0"
+val catsEffectV = "3.6.1"
 val circeV = "0.14.5"
 val sttpV = "3.10.1"
 val catsRetryV = "3.1.3"
@@ -19,6 +19,7 @@ val enumeratumV = "1.7.5"
 val chimneyV = "1.8.2"
 val jsoupV = "1.18.3"
 val munitCatsEffectV = "1.0.7"
+val upperboundV = "0.5.0"
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Full)
@@ -46,7 +47,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       "com.github.cb372" %%% "cats-retry" % catsRetryV,
       "com.beachape" %%% "enumeratum" % enumeratumV,
       "io.scalaland" %%% "chimney" % chimneyV,
+      "org.systemfw" %%% "upperbound" % upperboundV,
       "org.typelevel" %%% "munit-cats-effect-3" % munitCatsEffectV % Test,
+      "org.typelevel" %%% "cats-effect-testkit" % catsEffectV % Test,
     )
   )
   .jvmSettings(

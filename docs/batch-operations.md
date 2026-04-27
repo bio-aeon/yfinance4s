@@ -1,5 +1,10 @@
 # Batch Operations
 
+> **Rate limiting and concurrency compose independently.** All multi-ticker operations are paced by the client's
+> rate limiter (configured via `YFinanceClientConfig.rateLimit`, default 2 RPS). The `parallelism` /
+> `withParallelism` knob caps how many fibres are in-flight; the rate limiter caps how often new requests can
+> *start*. Both limits apply. See [Rate Limiting](index.md#rate-limiting) for configuration.
+
 ## Tickers Wrapper
 
 The `Tickers` wrapper provides a fluent API for fetching data across multiple tickers in parallel.

@@ -22,18 +22,24 @@ private object YFinanceScrapper {
   def resource[F[_]: Async](
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
-      retries: Int
+      retries: Int,
+      rateLimiter: RateLimiter[F]
   ): Resource[F, YFinanceScrapper[F]] =
-    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _))
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _, rateLimiter))
 
-  def apply[F[_]: Sync: Sleep](retries: Int, sttpBackend: SttpBackend[F, Any]): YFinanceScrapper[F] = {
+  def apply[F[_]: Sync: Sleep](
+      retries: Int,
+      sttpBackend: SttpBackend[F, Any],
+      rateLimiter: RateLimiter[F]
+  ): YFinanceScrapper[F] = {
     val retryPolicy = RetryPolicies.limitRetries(retries)
-    new YFinanceScrapperImpl[F](sttpBackend, retryPolicy)
+    new YFinanceScrapperImpl[F](sttpBackend, retryPolicy, rateLimiter)
   }
 
   private final class YFinanceScrapperImpl[F[_]](
       protected val sttpBackend: SttpBackend[F, Any],
-      protected val retryPolicy: RetryPolicy[F]
+      protected val retryPolicy: RetryPolicy[F],
+      protected val rateLimiter: RateLimiter[F]
   )(implicit
       protected val F: Sync[F],
       protected val S: Sleep[F]

@@ -42,6 +42,19 @@
 | `Quarterly` | Quarterly financial data (up to 5 quarters of history) |
 | `Trailing` | Trailing twelve months (TTM) data |
 
+## Configuration
+
+**YFinanceClientConfig** - Client configuration:
+- `connectTimeout`: HTTP connection timeout
+- `readTimeout`: HTTP read timeout
+- `retries`: Number of retry attempts for failed requests
+- `rateLimit`: Outbound request pacing (default: `RateLimitConfig.Enabled(maxRequestsPerSecond = 2)`)
+
+**RateLimitConfig** - Outbound request pacing applied at the single HTTP chokepoint, shared across all components of one client:
+- `Disabled` - no rate limiting
+- `Enabled(maxRequestsPerSecond)` - interval-based pacing; request starts are spaced no closer than `1.second / maxRequestsPerSecond` apart, with no burst capacity
+- `Default` - `Enabled(maxRequestsPerSecond = 2)`
+
 ## Data Models
 
 ### Charts

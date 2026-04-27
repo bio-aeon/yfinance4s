@@ -41,9 +41,12 @@ class MarketDataSpec extends CatsEffectSuite {
   test("includes the S&P 500 in the US market summary") {
     YFinanceClient.resource[IO](config).use { client =>
       client.markets.getSummary(US).map { summary =>
+        // Yahoo serves ^GSPC (cash) during regular hours and ES=F (E-mini S&P 500 futures)
+        // when the cash market is closed; either represents the same underlying index.
+        val present = summary.findBySymbol("^GSPC").orElse(summary.findBySymbol("ES=F"))
         assert(
-          summary.findBySymbol("^GSPC").isDefined,
-          s"expected ^GSPC in summary; got ${summary.quotes.map(_.symbol).mkString(",")}"
+          present.isDefined,
+          s"expected ^GSPC or ES=F in summary; got ${summary.quotes.map(_.symbol).mkString(",")}"
         )
       }
     }
