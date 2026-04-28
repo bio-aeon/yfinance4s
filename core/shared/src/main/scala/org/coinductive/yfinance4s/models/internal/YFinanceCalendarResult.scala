@@ -12,7 +12,7 @@ import io.circe.{Decoder, Json}
 private[yfinance4s] final case class YFinanceCalendarResult(
     columns: List[CalendarColumn],
     rows: List[CalendarRow],
-    error: Option[CalendarError]
+    error: Option[YahooErrorBody]
 ) {
 
   /** Zero-based column index keyed by Yahoo's stable `id` (not `label`). */
@@ -24,7 +24,7 @@ private[yfinance4s] object YFinanceCalendarResult {
 
   implicit val decoder: Decoder[YFinanceCalendarResult] = Decoder.instance { c =>
     val finance = c.downField("finance")
-    finance.downField("error").as[Option[CalendarError]].flatMap {
+    finance.downField("error").as[Option[YahooErrorBody]].flatMap {
       case err @ Some(_) =>
         Right(YFinanceCalendarResult(columns = Nil, rows = Nil, error = err))
 
@@ -66,13 +66,4 @@ private[yfinance4s] final case class CalendarRow(values: List[Json]) {
 private[yfinance4s] object CalendarRow {
   implicit val decoder: Decoder[CalendarRow] =
     Decoder[List[Json]].map(CalendarRow(_))
-}
-
-private[yfinance4s] final case class CalendarError(code: String, description: String) {
-  def toException: Throwable =
-    new Exception(s"Yahoo calendar query failed: $code - $description")
-}
-
-private[yfinance4s] object CalendarError {
-  implicit val decoder: Decoder[CalendarError] = deriveDecoder
 }

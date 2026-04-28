@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.Monad
+import cats.MonadThrow
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
@@ -31,42 +31,39 @@ trait Holders[F[_]] {
 
 private[yfinance4s] object Holders {
 
-  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Holders[F] =
+  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Holders[F] =
     new HoldersImpl(gateway, auth)
 
-  private final class HoldersImpl[F[_]: Monad](
+  private final class HoldersImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Holders[F] {
 
     def getMajorHolders(ticker: Ticker): F[Option[MajorHolders]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(extractMajorHolders)
-      }
+      fetchHolders(ticker).map(extractMajorHolders)
 
     def getInstitutionalHolders(ticker: Ticker): F[List[InstitutionalHolder]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(extractInstitutionalHolders)
-      }
+      fetchHolders(ticker).map(extractInstitutionalHolders)
 
     def getMutualFundHolders(ticker: Ticker): F[List[MutualFundHolder]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(extractMutualFundHolders)
-      }
+      fetchHolders(ticker).map(extractMutualFundHolders)
 
     def getInsiderTransactions(ticker: Ticker): F[List[InsiderTransaction]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(extractInsiderTransactions)
-      }
+      fetchHolders(ticker).map(extractInsiderTransactions)
 
     def getInsiderRoster(ticker: Ticker): F[List[InsiderRosterEntry]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(extractInsiderRoster)
-      }
+      fetchHolders(ticker).map(extractInsiderRoster)
 
     def getHoldersData(ticker: Ticker): F[Option[HoldersData]] =
+      fetchHolders(ticker).map(mapToHoldersData)
+
+    // --- Private Fetch + Error Translation ---
+
+    private def fetchHolders(ticker: Ticker): F[YFinanceHoldersResult] =
       auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).map(mapToHoldersData)
+        gateway.getHolders(ticker, credentials).flatTap { r =>
+          YahooErrorMapping.raiseIfPresent[F](ticker, r.quoteSummary.error)
+        }
       }
 
     // --- Private Mapping Helpers ---

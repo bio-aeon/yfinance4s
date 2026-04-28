@@ -111,7 +111,7 @@ trait YFinanceClient[F[_]] {
     YFinanceClient.downloadMulti(tickers, parallelism) { ticker =>
       charts.getChart(ticker, interval, range).flatMap {
         case Some(result) => C.pure(result)
-        case None         => C.raiseError[ChartResult](new NoSuchElementException(s"No chart data for ${ticker.value}"))
+        case None         => C.raiseError[ChartResult](YFinanceError.TickerNotFound(ticker))
       }
     }
 
@@ -126,7 +126,7 @@ trait YFinanceClient[F[_]] {
     YFinanceClient.downloadMulti(tickers, parallelism) { ticker =>
       charts.getChart(ticker, interval, since, until).flatMap {
         case Some(result) => C.pure(result)
-        case None         => C.raiseError[ChartResult](new NoSuchElementException(s"No chart data for ${ticker.value}"))
+        case None         => C.raiseError[ChartResult](YFinanceError.TickerNotFound(ticker))
       }
     }
 
@@ -138,7 +138,7 @@ trait YFinanceClient[F[_]] {
     YFinanceClient.downloadMulti(tickers, parallelism) { ticker =>
       charts.getStock(ticker).flatMap {
         case Some(result) => C.pure(result)
-        case None         => C.raiseError[StockResult](new NoSuchElementException(s"No stock data for ${ticker.value}"))
+        case None         => C.raiseError[StockResult](YFinanceError.TickerNotFound(ticker))
       }
     }
 
@@ -152,7 +152,7 @@ trait YFinanceClient[F[_]] {
       financials.getFinancialStatements(ticker, frequency).flatMap {
         case Some(result) => C.pure(result)
         case None =>
-          C.raiseError[FinancialStatements](new NoSuchElementException(s"No financial data for ${ticker.value}"))
+          C.raiseError[FinancialStatements](YFinanceError.TickerNotFound(ticker))
       }
     }
 }

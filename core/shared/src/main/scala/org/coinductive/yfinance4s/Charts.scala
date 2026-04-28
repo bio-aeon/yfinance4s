@@ -1,6 +1,7 @@
 package org.coinductive.yfinance4s
 
-import cats.Functor
+import cats.MonadThrow
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.internal.{YFinanceQueryResult, YFinanceQuoteResult}
@@ -61,29 +62,29 @@ trait Charts[F[_]] {
 
 private[yfinance4s] object Charts {
 
-  def apply[F[_]: Functor](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
+  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
     new ChartsImpl(gateway, scrapper)
 
-  private final class ChartsImpl[F[_]: Functor](
+  private final class ChartsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F]
   ) extends Charts[F] {
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[Option[ChartResult]] =
-      gateway.getChart(ticker, interval, range).map(mapQueryResult)
+      fetchChart(ticker, interval, range).map(mapQueryResult)
 
     def getChart(
         ticker: Ticker,
         interval: Interval,
         since: ZonedDateTime,
         until: ZonedDateTime
-    ): F[Option[ChartResult]] = gateway.getChart(ticker, interval, since, until).map(mapQueryResult)
+    ): F[Option[ChartResult]] = fetchChart(ticker, interval, since, until).map(mapQueryResult)
 
     def getStock(ticker: Ticker): F[Option[StockResult]] =
       scrapper.getQuote(ticker).map(_.flatMap(mapQuoteResult))
 
     def getDividends(ticker: Ticker, interval: Interval, range: Range): F[Option[List[DividendEvent]]] =
-      gateway.getChart(ticker, interval, range).map(extractDividends)
+      fetchChart(ticker, interval, range).map(extractDividends)
 
     def getDividends(
         ticker: Ticker,
@@ -91,10 +92,10 @@ private[yfinance4s] object Charts {
         since: ZonedDateTime,
         until: ZonedDateTime
     ): F[Option[List[DividendEvent]]] =
-      gateway.getChart(ticker, interval, since, until).map(extractDividends)
+      fetchChart(ticker, interval, since, until).map(extractDividends)
 
     def getSplits(ticker: Ticker, interval: Interval, range: Range): F[Option[List[SplitEvent]]] =
-      gateway.getChart(ticker, interval, range).map(extractSplits)
+      fetchChart(ticker, interval, range).map(extractSplits)
 
     def getSplits(
         ticker: Ticker,
@@ -102,10 +103,10 @@ private[yfinance4s] object Charts {
         since: ZonedDateTime,
         until: ZonedDateTime
     ): F[Option[List[SplitEvent]]] =
-      gateway.getChart(ticker, interval, since, until).map(extractSplits)
+      fetchChart(ticker, interval, since, until).map(extractSplits)
 
     def getCorporateActions(ticker: Ticker, interval: Interval, range: Range): F[Option[CorporateActions]] =
-      gateway.getChart(ticker, interval, range).map(extractCorporateActions)
+      fetchChart(ticker, interval, range).map(extractCorporateActions)
 
     def getCorporateActions(
         ticker: Ticker,
@@ -113,7 +114,22 @@ private[yfinance4s] object Charts {
         since: ZonedDateTime,
         until: ZonedDateTime
     ): F[Option[CorporateActions]] =
-      gateway.getChart(ticker, interval, since, until).map(extractCorporateActions)
+      fetchChart(ticker, interval, since, until).map(extractCorporateActions)
+
+    // --- Private Fetch + Error Translation ---
+
+    private def fetchChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] =
+      gateway.getChart(ticker, interval, range).flatTap(r => YahooErrorMapping.raiseIfPresent[F](ticker, r.chart.error))
+
+    private def fetchChart(
+        ticker: Ticker,
+        interval: Interval,
+        since: ZonedDateTime,
+        until: ZonedDateTime
+    ): F[YFinanceQueryResult] =
+      gateway
+        .getChart(ticker, interval, since, until)
+        .flatTap(r => YahooErrorMapping.raiseIfPresent[F](ticker, r.chart.error))
 
     // --- Private Mapping Helpers ---
 

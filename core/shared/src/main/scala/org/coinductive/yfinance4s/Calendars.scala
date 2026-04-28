@@ -211,7 +211,16 @@ private[yfinance4s] object Calendars {
     // --- Error escalation -------------------------------------------------
 
     private def raiseOnError(r: YFinanceCalendarResult): F[YFinanceCalendarResult] =
-      r.error.fold(F.pure(r))(err => F.raiseError(err.toException))
+      r.error match {
+        case Some(YahooErrorBody(YahooErrorMapping.TooManyRequestsCode, _)) =>
+          F.raiseError(YFinanceError.RateLimited(retryAfter = None))
+        case Some(err) =>
+          F.raiseError(
+            YFinanceError.DataParseError(s"Yahoo calendar query failed: ${err.code} - ${err.description}")
+          )
+        case None =>
+          F.pure(r)
+      }
 
     // --- Row mapping ------------------------------------------------------
     //
@@ -278,19 +287,22 @@ private[yfinance4s] object Calendars {
     ): F[String] =
       idx.get(field).flatMap(row.stringAt) match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Missing required field '$field' in $context response row"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Missing required field '$field' in $context response row"))
       }
 
     private def parseZdt(s: String, field: String, context: String): F[ZonedDateTime] =
       parseZonedDateTime(s) match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Unparseable '$field' in $context response row: '$s'"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Unparseable '$field' in $context response row: '$s'"))
       }
 
     private def requireEnum[A](lookup: Option[A], raw: String, field: String, context: String): F[A] =
       lookup match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Unknown '$field' value in $context response row: '$raw'"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Unknown '$field' value in $context response row: '$raw'"))
       }
 
     private def optString(row: CalendarRow, idx: Map[String, Int], field: String): Option[String] =

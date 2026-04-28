@@ -10,10 +10,15 @@ private[yfinance4s] final case class YFinanceQueryResult(chart: Chart)
 private[yfinance4s] object YFinanceQueryResult {
   implicit val decoder: Decoder[YFinanceQueryResult] = deriveDecoder
 
-  private[yfinance4s] final case class Chart(result: List[InstrumentData])
+  private[yfinance4s] final case class Chart(result: List[InstrumentData], error: Option[YahooErrorBody])
 
   private[yfinance4s] object Chart {
-    implicit val decoder: Decoder[Chart] = deriveDecoder
+    implicit val decoder: Decoder[Chart] = Decoder.instance { c =>
+      for {
+        result <- c.downField("result").as[Option[List[InstrumentData]]].map(_.getOrElse(Nil))
+        error <- c.downField("error").as[Option[YahooErrorBody]]
+      } yield Chart(result, error)
+    }
   }
 
   private[yfinance4s] final case class InstrumentData(

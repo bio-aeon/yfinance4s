@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.Monad
+import cats.MonadThrow
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
@@ -37,10 +37,10 @@ trait Analysts[F[_]] {
 
 private[yfinance4s] object Analysts {
 
-  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Analysts[F] =
+  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Analysts[F] =
     new AnalystsImpl(gateway, auth)
 
-  private final class AnalystsImpl[F[_]: Monad](
+  private final class AnalystsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Analysts[F] {
@@ -73,7 +73,10 @@ private[yfinance4s] object Analysts {
 
     private def fetchAnalystData[A](ticker: Ticker)(extract: YFinanceAnalystResult => A): F[A] =
       auth.getCredentials.flatMap { credentials =>
-        gateway.getAnalystData(ticker, credentials).map(extract)
+        gateway
+          .getAnalystData(ticker, credentials)
+          .flatTap(r => YahooErrorMapping.raiseIfPresent[F](ticker, r.quoteSummary.error))
+          .map(extract)
       }
 
     private def analystQuoteData(result: YFinanceAnalystResult): Option[AnalystQuoteData] =

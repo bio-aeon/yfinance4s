@@ -75,49 +75,49 @@ final class Tickers[F[_]] private (
 
   /** Fetches historical chart data for all tickers by range. */
   def history(interval: Interval, range: Range)(implicit C: Concurrent[F]): F[Map[Ticker, ChartResult]] =
-    fetchAll(_.charts.getChart(_, interval, range), "chart data")
+    fetchAll(_.charts.getChart(_, interval, range))
 
   /** Fetches historical chart data for all tickers by date range. */
   def history(interval: Interval, since: ZonedDateTime, until: ZonedDateTime)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, ChartResult]] =
-    fetchAll(_.charts.getChart(_, interval, since, until), "chart data")
+    fetchAll(_.charts.getChart(_, interval, since, until))
 
   /** Fetches current stock quotes for all tickers. */
   def info(implicit C: Concurrent[F]): F[Map[Ticker, StockResult]] =
-    fetchAll(_.charts.getStock(_), "stock data")
+    fetchAll(_.charts.getStock(_))
 
   /** Fetches financial statements for all tickers. */
   def financials(frequency: Frequency = Frequency.Yearly)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, FinancialStatements]] =
-    fetchAll(_.financials.getFinancialStatements(_, frequency), "financial data")
+    fetchAll(_.financials.getFinancialStatements(_, frequency))
 
   /** Fetches dividend history for all tickers. */
   def dividends(interval: Interval, range: Range)(implicit C: Concurrent[F]): F[Map[Ticker, List[DividendEvent]]] =
-    fetchAll(_.charts.getDividends(_, interval, range), "dividend data")
+    fetchAll(_.charts.getDividends(_, interval, range))
 
   /** Fetches stock split history for all tickers. */
   def splits(interval: Interval, range: Range)(implicit C: Concurrent[F]): F[Map[Ticker, List[SplitEvent]]] =
-    fetchAll(_.charts.getSplits(_, interval, range), "split data")
+    fetchAll(_.charts.getSplits(_, interval, range))
 
   /** Fetches combined corporate actions for all tickers. */
   def corporateActions(interval: Interval, range: Range)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, CorporateActions]] =
-    fetchAll(_.charts.getCorporateActions(_, interval, range), "corporate actions")
+    fetchAll(_.charts.getCorporateActions(_, interval, range))
 
   /** Fetches holders information for all tickers. */
   def holdersData(implicit C: Concurrent[F]): F[Map[Ticker, HoldersData]] =
-    fetchAll(_.holders.getHoldersData(_), "holders data")
+    fetchAll(_.holders.getHoldersData(_))
 
   /** Fetches analyst data for all tickers. */
   def analystData(implicit C: Concurrent[F]): F[Map[Ticker, AnalystData]] =
-    fetchAll(_.analysts.getAnalystData(_), "analyst data")
+    fetchAll(_.analysts.getAnalystData(_))
 
   /** Fetches option expiration dates for all tickers. */
   def optionExpirations(implicit C: Concurrent[F]): F[Map[Ticker, List[LocalDate]]] =
-    fetchAll(_.options.getOptionExpirations(_), "option expirations")
+    fetchAll(_.options.getOptionExpirations(_))
 
   // --- Error-Tolerant Data Methods ---
 
@@ -125,85 +125,81 @@ final class Tickers[F[_]] private (
   def attemptHistory(interval: Interval, range: Range)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, ChartResult]]] =
-    fetchAllAttempt(_.charts.getChart(_, interval, range), "chart data")
+    fetchAllAttempt(_.charts.getChart(_, interval, range))
 
   /** Fetches historical chart data by date range, collecting errors per ticker. */
   def attemptHistory(interval: Interval, since: ZonedDateTime, until: ZonedDateTime)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, ChartResult]]] =
-    fetchAllAttempt(_.charts.getChart(_, interval, since, until), "chart data")
+    fetchAllAttempt(_.charts.getChart(_, interval, since, until))
 
   /** Fetches current stock quotes, collecting errors per ticker. */
   def attemptInfo(implicit C: Concurrent[F]): F[Map[Ticker, Either[Throwable, StockResult]]] =
-    fetchAllAttempt(_.charts.getStock(_), "stock data")
+    fetchAllAttempt(_.charts.getStock(_))
 
   /** Fetches financial statements, collecting errors per ticker. */
   def attemptFinancials(frequency: Frequency = Frequency.Yearly)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, FinancialStatements]]] =
-    fetchAllAttempt(_.financials.getFinancialStatements(_, frequency), "financial data")
+    fetchAllAttempt(_.financials.getFinancialStatements(_, frequency))
 
   /** Fetches dividend history, collecting errors per ticker. */
   def attemptDividends(interval: Interval, range: Range)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, List[DividendEvent]]]] =
-    fetchAllAttempt(_.charts.getDividends(_, interval, range), "dividend data")
+    fetchAllAttempt(_.charts.getDividends(_, interval, range))
 
   /** Fetches stock split history, collecting errors per ticker. */
   def attemptSplits(interval: Interval, range: Range)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, List[SplitEvent]]]] =
-    fetchAllAttempt(_.charts.getSplits(_, interval, range), "split data")
+    fetchAllAttempt(_.charts.getSplits(_, interval, range))
 
   /** Fetches corporate actions, collecting errors per ticker. */
   def attemptCorporateActions(interval: Interval, range: Range)(implicit
       C: Concurrent[F]
   ): F[Map[Ticker, Either[Throwable, CorporateActions]]] =
-    fetchAllAttempt(_.charts.getCorporateActions(_, interval, range), "corporate actions")
+    fetchAllAttempt(_.charts.getCorporateActions(_, interval, range))
 
   /** Fetches holders information, collecting errors per ticker. */
   def attemptHoldersData(implicit C: Concurrent[F]): F[Map[Ticker, Either[Throwable, HoldersData]]] =
-    fetchAllAttempt(_.holders.getHoldersData(_), "holders data")
+    fetchAllAttempt(_.holders.getHoldersData(_))
 
   /** Fetches analyst data, collecting errors per ticker. */
   def attemptAnalystData(implicit C: Concurrent[F]): F[Map[Ticker, Either[Throwable, AnalystData]]] =
-    fetchAllAttempt(_.analysts.getAnalystData(_), "analyst data")
+    fetchAllAttempt(_.analysts.getAnalystData(_))
 
   /** Fetches option expiration dates, collecting errors per ticker. */
   def attemptOptionExpirations(implicit C: Concurrent[F]): F[Map[Ticker, Either[Throwable, List[LocalDate]]]] =
-    fetchAllAttempt(_.options.getOptionExpirations(_), "option expirations")
+    fetchAllAttempt(_.options.getOptionExpirations(_))
 
   // --- Internal Helpers ---
 
   /** Fail-fast parallel fetch. Raises on the first failure. */
   private def fetchAll[A](
-      f: (YFinanceClient[F], Ticker) => F[Option[A]],
-      dataType: String
+      f: (YFinanceClient[F], Ticker) => F[Option[A]]
   )(implicit C: Concurrent[F]): F[Map[Ticker, A]] =
     tickers.toList
       .parTraverseN(parallelism) { ticker =>
-        requireSome(ticker, dataType)(f(client, ticker)).map(ticker -> _)
+        requireSome(ticker)(f(client, ticker)).map(ticker -> _)
       }
       .map(_.toMap)
 
   /** Error-tolerant parallel fetch. Collects all results as Either. */
   private def fetchAllAttempt[A](
-      f: (YFinanceClient[F], Ticker) => F[Option[A]],
-      dataType: String
+      f: (YFinanceClient[F], Ticker) => F[Option[A]]
   )(implicit C: Concurrent[F]): F[Map[Ticker, Either[Throwable, A]]] =
     tickers.toList
       .parTraverseN(parallelism) { ticker =>
-        requireSome(ticker, dataType)(f(client, ticker)).attempt.map(ticker -> _)
+        requireSome(ticker)(f(client, ticker)).attempt.map(ticker -> _)
       }
       .map(_.toMap)
 
-  /** Unwraps F[Option[A]] into F[A], raising NoSuchElementException when None. */
-  private def requireSome[A](ticker: Ticker, dataType: String)(fo: F[Option[A]])(implicit
-      C: Concurrent[F]
-  ): F[A] =
+  /** Unwraps `F[Option[A]]` into `F[A]`, raising [[YFinanceError.TickerNotFound]] when `None`. */
+  private def requireSome[A](ticker: Ticker)(fo: F[Option[A]])(implicit C: Concurrent[F]): F[A] =
     fo.flatMap {
       case Some(a) => C.pure(a)
-      case None    => C.raiseError(new NoSuchElementException(s"No $dataType for ${ticker.value}"))
+      case None    => C.raiseError(YFinanceError.TickerNotFound(ticker))
     }
 }
 

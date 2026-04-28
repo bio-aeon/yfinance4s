@@ -11,7 +11,7 @@ private[yfinance4s] object YFinanceOptionsResult {
 
 private[yfinance4s] final case class OptionChainResponse(
     result: List[OptionDataRaw],
-    error: Option[String]
+    error: Option[YahooErrorBody]
 )
 
 private[yfinance4s] object OptionChainResponse {

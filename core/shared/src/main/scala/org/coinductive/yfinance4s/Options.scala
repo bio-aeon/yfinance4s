@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.Monad
+import cats.MonadThrow
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
@@ -24,29 +24,39 @@ trait Options[F[_]] {
 
 private[yfinance4s] object Options {
 
-  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Options[F] =
+  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Options[F] =
     new OptionsImpl(gateway, auth)
 
-  private final class OptionsImpl[F[_]: Monad](
+  private final class OptionsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Options[F] {
 
     def getOptionExpirations(ticker: Ticker): F[Option[List[LocalDate]]] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getOptions(ticker, credentials).map(extractExpirations)
-      }
+      fetchOptions(ticker).map(extractExpirations)
 
     def getOptionChain(ticker: Ticker, expirationDate: LocalDate): F[Option[OptionChain]] = {
       val epochSeconds = expirationDate.atStartOfDay(ZoneOffset.UTC).toEpochSecond
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getOptions(ticker, epochSeconds, credentials).map(extractOptionChain(_, expirationDate))
-      }
+      fetchOptions(ticker, epochSeconds).map(extractOptionChain(_, expirationDate))
     }
 
     def getFullOptionChain(ticker: Ticker): F[Option[FullOptionChain]] =
+      fetchOptions(ticker).map(mapToFullOptionChain)
+
+    // --- Private Fetch + Error Translation ---
+
+    private def fetchOptions(ticker: Ticker): F[YFinanceOptionsResult] =
       auth.getCredentials.flatMap { credentials =>
-        gateway.getOptions(ticker, credentials).map(mapToFullOptionChain)
+        gateway.getOptions(ticker, credentials).flatTap { r =>
+          YahooErrorMapping.raiseIfPresent[F](ticker, r.optionChain.error)
+        }
+      }
+
+    private def fetchOptions(ticker: Ticker, epochSeconds: Long): F[YFinanceOptionsResult] =
+      auth.getCredentials.flatMap { credentials =>
+        gateway.getOptions(ticker, epochSeconds, credentials).flatTap { r =>
+          YahooErrorMapping.raiseIfPresent[F](ticker, r.optionChain.error)
+        }
       }
 
     // --- Private Mapping Helpers ---

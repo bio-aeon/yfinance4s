@@ -15,7 +15,7 @@ private[yfinance4s] object YFinanceHoldersResult {
 
 private[yfinance4s] final case class HoldersQuoteSummary(
     result: List[HoldersQuoteData],
-    error: Option[String]
+    error: Option[YahooErrorBody]
 )
 
 private[yfinance4s] object HoldersQuoteSummary {
