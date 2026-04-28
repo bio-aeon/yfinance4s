@@ -228,7 +228,7 @@ private[yfinance4s] object Calendars {
     // Soft fields (best-effort) fall through to Option when the value is null or the column is missing.
 
     private def mapMarketWide(raw: YFinanceCalendarResult): F[List[EarningsEvent]] =
-      raw.rows.traverse(mapMarketWideRow(raw.columnIndex)).map(_.sorted(EarningsEvent.byDateAsc))
+      raw.rows.traverse(mapMarketWideRow(raw.columnIndex)).map(_.sorted(using EarningsEvent.byDateAsc))
 
     private def mapMarketWideRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsEvent] =
       for {
@@ -255,7 +255,7 @@ private[yfinance4s] object Calendars {
       )
 
     private def mapPerTicker(raw: YFinanceCalendarResult): F[List[EarningsDate]] =
-      raw.rows.traverse(mapPerTickerRow(raw.columnIndex)).map(_.sorted(EarningsDate.byDateDesc))
+      raw.rows.traverse(mapPerTickerRow(raw.columnIndex)).map(_.sorted(using EarningsDate.byDateDesc))
 
     private def mapPerTickerRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsDate] =
       for {

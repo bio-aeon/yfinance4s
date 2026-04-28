@@ -94,7 +94,7 @@ class EarningsEventSpec extends FunSuite {
     val a = event(symbol = "A", startDateTime = reference.plusDays(2))
     val b = event(symbol = "B", startDateTime = reference.plusDays(1))
     val c = event(symbol = "C", startDateTime = reference)
-    val sorted = List(a, b, c).sorted(EarningsEvent.byDateAsc)
+    val sorted = List(a, b, c).sorted(using EarningsEvent.byDateAsc)
     assertEquals(sorted.map(_.symbol.value), List("C", "B", "A"))
   }
 
@@ -102,7 +102,7 @@ class EarningsEventSpec extends FunSuite {
     val a = event(symbol = "A", marketCap = None)
     val b = event(symbol = "B", marketCap = Some(500_000_000_000L))
     val c = event(symbol = "C", marketCap = Some(3_000_000_000_000L))
-    val sorted = List(a, b, c).sorted(EarningsEvent.byMarketCapDesc)
+    val sorted = List(a, b, c).sorted(using EarningsEvent.byMarketCapDesc)
     assertEquals(sorted.map(_.symbol.value), List("C", "B", "A"))
   }
 }

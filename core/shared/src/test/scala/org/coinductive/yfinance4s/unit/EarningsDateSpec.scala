@@ -78,7 +78,7 @@ class EarningsDateSpec extends FunSuite {
     val a = date(d = reference.minusDays(1))
     val b = date(d = reference.plusDays(1))
     val c = date(d = reference)
-    val sorted = List(a, b, c).sorted(EarningsDate.byDateDesc)
+    val sorted = List(a, b, c).sorted(using EarningsDate.byDateDesc)
     assertEquals(sorted.map(_.date), List(b.date, c.date, a.date))
   }
 }

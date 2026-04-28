@@ -58,7 +58,7 @@ class InstitutionalHolderSpec extends FunSuite {
     val holder2 = InstitutionalHolder("B", LocalDate.of(2024, 6, 1), 0.05, 100, 1000)
     val holder3 = InstitutionalHolder("C", LocalDate.of(2024, 3, 1), 0.05, 100, 1000)
 
-    val sorted = List(holder1, holder2, holder3).sorted(InstitutionalHolder.orderingByDate)
+    val sorted = List(holder1, holder2, holder3).sorted(using InstitutionalHolder.orderingByDate)
 
     assertEquals(sorted.map(_.organization), List("B", "C", "A"))
   }

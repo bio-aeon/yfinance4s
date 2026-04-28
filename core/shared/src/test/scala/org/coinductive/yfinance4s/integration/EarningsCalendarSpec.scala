@@ -90,7 +90,7 @@ class EarningsCalendarSpec extends CatsEffectSuite {
     YFinanceClient.resource[IO](config).use { client =>
       client.calendars.getEarningsDates(Ticker("AAPL"), limit = 8).map { dates =>
         val stamps = dates.map(_.date)
-        assertEquals(stamps, stamps.sorted(Ordering[ZonedDateTime].reverse))
+        assertEquals(stamps, stamps.sortWith(_.isAfter(_)))
       }
     }
   }

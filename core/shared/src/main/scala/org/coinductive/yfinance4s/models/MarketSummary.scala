@@ -44,7 +44,7 @@ object MarketIndexQuote {
   /** Sorted by `regularMarketChangePercent` descending; `None` values last. */
   implicit val byChangePercentDesc: Ordering[MarketIndexQuote] =
     Ordering
-      .by[MarketIndexQuote, Option[Double]](_.regularMarketChangePercent)(Ordering[Option[Double]].reverse)
+      .by[MarketIndexQuote, Option[Double]](_.regularMarketChangePercent)(using Ordering[Option[Double]].reverse)
 }
 
 /** A region's market-summary snapshot: headline indices and instruments. Ordered as Yahoo returned them. */
@@ -68,14 +68,14 @@ final case class MarketSummary(
   def largestGainer: Option[MarketIndexQuote] =
     quotes
       .filter(_.regularMarketChangePercent.exists(_ > 0))
-      .sorted(MarketIndexQuote.byChangePercentDesc)
+      .sorted(using MarketIndexQuote.byChangePercentDesc)
       .headOption
 
   /** The quote with the lowest (most-negative) `regularMarketChangePercent`. */
   def largestLoser: Option[MarketIndexQuote] =
     quotes
       .filter(_.regularMarketChangePercent.exists(_ < 0))
-      .sortBy(_.regularMarketChangePercent)(Ordering[Option[Double]])
+      .sortBy(_.regularMarketChangePercent)(using Ordering[Option[Double]])
       .headOption
 
   /** Quotes whose absolute change percent meets or exceeds the threshold (fraction, e.g., `0.02` for ±2%). */

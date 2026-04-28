@@ -51,7 +51,7 @@ final case class SectorIndustry(
 
 object SectorIndustry {
   implicit val ordering: Ordering[SectorIndustry] =
-    Ordering.by[SectorIndustry, Option[Double]](_.marketWeight)(Ordering[Option[Double]].reverse)
+    Ordering.by[SectorIndustry, Option[Double]](_.marketWeight)(using Ordering[Option[Double]].reverse)
 }
 
 final case class ResearchReport(
@@ -104,6 +104,6 @@ final case class SectorData(
   /** Top N companies by market weight. */
   def topCompaniesByWeight(n: Int): List[TopCompany] =
     topCompanies
-      .sortBy(_.marketWeight)(Ordering[Option[Double]].reverse)
+      .sortBy(_.marketWeight)(using Ordering[Option[Double]].reverse)
       .take(n)
 }
