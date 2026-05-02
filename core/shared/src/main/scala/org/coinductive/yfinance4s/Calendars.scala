@@ -199,27 +199,13 @@ private[yfinance4s] object Calendars {
     ): F[List[EarningsEvent]] =
       auth.getCredentials.flatMap { creds =>
         val body = buildMarketWideBody(start, end, config)
-        gateway.postVisualization(body, creds).flatMap(raiseOnError).flatMap(mapMarketWide)
+        gateway.postVisualization(body, creds, ticker = None).flatMap(mapMarketWide)
       }
 
     def getEarningsDates(ticker: Ticker, limit: Int, offset: Int): F[List[EarningsDate]] =
       auth.getCredentials.flatMap { creds =>
         val body = buildPerTickerBody(ticker, limit, offset)
-        gateway.postVisualization(body, creds).flatMap(raiseOnError).flatMap(mapPerTicker)
-      }
-
-    // --- Error escalation -------------------------------------------------
-
-    private def raiseOnError(r: YFinanceCalendarResult): F[YFinanceCalendarResult] =
-      r.error match {
-        case Some(YahooErrorBody(YahooErrorMapping.TooManyRequestsCode, _)) =>
-          F.raiseError(YFinanceError.RateLimited(retryAfter = None))
-        case Some(err) =>
-          F.raiseError(
-            YFinanceError.DataParseError(s"Yahoo calendar query failed: ${err.code} - ${err.description}")
-          )
-        case None =>
-          F.pure(r)
+        gateway.postVisualization(body, creds, ticker = Some(ticker)).flatMap(mapPerTicker)
       }
 
     // --- Row mapping ------------------------------------------------------
@@ -227,7 +213,7 @@ private[yfinance4s] object Calendars {
     // Structural fields (API-guaranteed) raise loudly when absent or malformed.
     // Soft fields (best-effort) fall through to Option when the value is null or the column is missing.
 
-    private def mapMarketWide(raw: YFinanceCalendarResult): F[List[EarningsEvent]] =
+    private def mapMarketWide(raw: Calendar): F[List[EarningsEvent]] =
       raw.rows.traverse(mapMarketWideRow(raw.columnIndex)).map(_.sorted(using EarningsEvent.byDateAsc))
 
     private def mapMarketWideRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsEvent] =
@@ -254,7 +240,7 @@ private[yfinance4s] object Calendars {
         surprisePercent = optDouble(row, idx, Field.EpsSurprisePct)
       )
 
-    private def mapPerTicker(raw: YFinanceCalendarResult): F[List[EarningsDate]] =
+    private def mapPerTicker(raw: Calendar): F[List[EarningsDate]] =
       raw.rows.traverse(mapPerTickerRow(raw.columnIndex)).map(_.sorted(using EarningsDate.byDateDesc))
 
     private def mapPerTickerRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsDate] =

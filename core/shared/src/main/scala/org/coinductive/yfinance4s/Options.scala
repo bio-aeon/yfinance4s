@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.MonadThrow
+import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
@@ -24,57 +24,43 @@ trait Options[F[_]] {
 
 private[yfinance4s] object Options {
 
-  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Options[F] =
+  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Options[F] =
     new OptionsImpl(gateway, auth)
 
-  private final class OptionsImpl[F[_]: MonadThrow](
+  private final class OptionsImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Options[F] {
 
     def getOptionExpirations(ticker: Ticker): F[Option[List[LocalDate]]] =
-      fetchOptions(ticker).map(extractExpirations)
+      auth.getCredentials.flatMap(creds => gateway.getOptions(ticker, creds).map(extractExpirations))
 
     def getOptionChain(ticker: Ticker, expirationDate: LocalDate): F[Option[OptionChain]] = {
       val epochSeconds = expirationDate.atStartOfDay(ZoneOffset.UTC).toEpochSecond
-      fetchOptions(ticker, epochSeconds).map(extractOptionChain(_, expirationDate))
+      auth.getCredentials.flatMap { creds =>
+        gateway.getOptions(ticker, epochSeconds, creds).map(extractOptionChain(_, expirationDate))
+      }
     }
 
     def getFullOptionChain(ticker: Ticker): F[Option[FullOptionChain]] =
-      fetchOptions(ticker).map(mapToFullOptionChain)
-
-    // --- Private Fetch + Error Translation ---
-
-    private def fetchOptions(ticker: Ticker): F[YFinanceOptionsResult] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getOptions(ticker, credentials).flatTap { r =>
-          YahooErrorMapping.raiseIfPresent[F](ticker, r.optionChain.error)
-        }
-      }
-
-    private def fetchOptions(ticker: Ticker, epochSeconds: Long): F[YFinanceOptionsResult] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getOptions(ticker, epochSeconds, credentials).flatTap { r =>
-          YahooErrorMapping.raiseIfPresent[F](ticker, r.optionChain.error)
-        }
-      }
+      auth.getCredentials.flatMap(creds => gateway.getOptions(ticker, creds).map(mapToFullOptionChain))
 
     // --- Private Mapping Helpers ---
 
-    private def extractExpirations(result: YFinanceOptionsResult): Option[List[LocalDate]] =
-      result.optionChain.result.headOption.map { data =>
+    private def extractExpirations(response: OptionChainResponse): Option[List[LocalDate]] =
+      response.result.headOption.map { data =>
         data.expirationDates.map(epochToLocalDate).sorted
       }
 
-    private def extractOptionChain(result: YFinanceOptionsResult, requestedDate: LocalDate): Option[OptionChain] =
-      result.optionChain.result.headOption.flatMap { data =>
+    private def extractOptionChain(response: OptionChainResponse, requestedDate: LocalDate): Option[OptionChain] =
+      response.result.headOption.flatMap { data =>
         data.options
           .find(container => epochToLocalDate(container.expirationDate) == requestedDate)
           .map(container => buildOptionChain(container, data.strikes))
       }
 
-    private def mapToFullOptionChain(result: YFinanceOptionsResult): Option[FullOptionChain] =
-      result.optionChain.result.headOption.map { data =>
+    private def mapToFullOptionChain(response: OptionChainResponse): Option[FullOptionChain] =
+      response.result.headOption.map { data =>
         val expirations = data.expirationDates.map(epochToLocalDate).sorted
         val underlyingPrice = data.quote.flatMap(_.regularMarketPrice)
 

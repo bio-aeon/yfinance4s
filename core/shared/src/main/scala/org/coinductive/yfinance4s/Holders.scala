@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s
 
-import cats.MonadThrow
+import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.Mapping.*
@@ -31,10 +31,10 @@ trait Holders[F[_]] {
 
 private[yfinance4s] object Holders {
 
-  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Holders[F] =
+  def apply[F[_]: Monad](gateway: YFinanceGateway[F], auth: YFinanceAuth[F]): Holders[F] =
     new HoldersImpl(gateway, auth)
 
-  private final class HoldersImpl[F[_]: MonadThrow](
+  private final class HoldersImpl[F[_]: Monad](
       gateway: YFinanceGateway[F],
       auth: YFinanceAuth[F]
   ) extends Holders[F] {
@@ -57,56 +57,50 @@ private[yfinance4s] object Holders {
     def getHoldersData(ticker: Ticker): F[Option[HoldersData]] =
       fetchHolders(ticker).map(mapToHoldersData)
 
-    // --- Private Fetch + Error Translation ---
+    // --- Private Fetch + Mapping Helpers ---
 
-    private def fetchHolders(ticker: Ticker): F[YFinanceHoldersResult] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getHolders(ticker, credentials).flatTap { r =>
-          YahooErrorMapping.raiseIfPresent[F](ticker, r.quoteSummary.error)
-        }
-      }
+    private def fetchHolders(ticker: Ticker): F[HoldersQuoteSummary] =
+      auth.getCredentials.flatMap(creds => gateway.getHolders(ticker, creds))
 
-    // --- Private Mapping Helpers ---
-
-    private def extractMajorHolders(result: YFinanceHoldersResult): Option[MajorHolders] =
-      result.quoteSummary.result.headOption.flatMap { data =>
+    private def extractMajorHolders(result: HoldersQuoteSummary): Option[MajorHolders] =
+      result.result.headOption.flatMap { data =>
         data.majorHoldersBreakdown.flatMap(mapMajorHolders)
       }
 
-    private def extractInstitutionalHolders(result: YFinanceHoldersResult): List[InstitutionalHolder] =
-      result.quoteSummary.result.headOption
+    private def extractInstitutionalHolders(result: HoldersQuoteSummary): List[InstitutionalHolder] =
+      result.result.headOption
         .flatMap(_.institutionOwnership)
         .flatMap(_.ownershipList)
         .getOrElse(List.empty)
         .flatMap(mapInstitutionalHolder)
         .sorted
 
-    private def extractMutualFundHolders(result: YFinanceHoldersResult): List[MutualFundHolder] =
-      result.quoteSummary.result.headOption
+    private def extractMutualFundHolders(result: HoldersQuoteSummary): List[MutualFundHolder] =
+      result.result.headOption
         .flatMap(_.fundOwnership)
         .flatMap(_.ownershipList)
         .getOrElse(List.empty)
         .flatMap(mapMutualFundHolder)
         .sorted
 
-    private def extractInsiderTransactions(result: YFinanceHoldersResult): List[InsiderTransaction] =
-      result.quoteSummary.result.headOption
+    private def extractInsiderTransactions(result: HoldersQuoteSummary): List[InsiderTransaction] =
+      result.result.headOption
         .flatMap(_.insiderTransactions)
         .flatMap(_.transactions)
         .getOrElse(List.empty)
         .flatMap(mapInsiderTransaction)
         .sorted
 
-    private def extractInsiderRoster(result: YFinanceHoldersResult): List[InsiderRosterEntry] =
-      result.quoteSummary.result.headOption
+    private def extractInsiderRoster(result: HoldersQuoteSummary): List[InsiderRosterEntry] =
+      result.result.headOption
         .flatMap(_.insiderHolders)
         .flatMap(_.holders)
         .getOrElse(List.empty)
         .flatMap(mapInsiderRosterEntry)
         .sorted
 
-    private def mapToHoldersData(result: YFinanceHoldersResult): Option[HoldersData] =
-      result.quoteSummary.result.headOption.map { data =>
+    private def mapToHoldersData(result: HoldersQuoteSummary): Option[HoldersData] =
+      result.result.headOption.map { data =>
         HoldersData(
           majorHolders = data.majorHoldersBreakdown.flatMap(mapMajorHolders),
           institutionalHolders = data.institutionOwnership

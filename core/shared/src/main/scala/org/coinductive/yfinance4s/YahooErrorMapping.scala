@@ -4,9 +4,10 @@ import cats.MonadThrow
 import org.coinductive.yfinance4s.models.{Ticker, YFinanceError}
 import org.coinductive.yfinance4s.models.internal.YahooErrorBody
 
-/** Maps Yahoo Finance's structured [[YahooErrorBody]] envelope onto the public [[YFinanceError]] hierarchy. Shared
-  * across every algebra that decodes a response containing an `error: Option[YahooErrorBody]` field (chart, options,
-  * holders, analysts, calendar, …) so each endpoint applies the same code-to-error policy.
+/** Maps Yahoo Finance's structured [[YahooErrorBody]] envelope onto the public [[YFinanceError]] hierarchy. Used by the
+  * gateway after a `YahooResponse[_]` decodes to a [[org.coinductive.yfinance4s.models.internal.YahooResponse.Failure]]
+  *   - the gateway picks [[raiseFor]] for ticker-context endpoints and [[raiseGeneric]] for endpoints without a ticker
+  *     (search, screener, market summary, market-wide calendar).
   */
 private[yfinance4s] object YahooErrorMapping {
 
@@ -18,24 +19,32 @@ private[yfinance4s] object YahooErrorMapping {
     */
   val TooManyRequestsCode: String = "Too Many Requests"
 
-  /** Raises the appropriate `YFinanceError` when the response carries an error envelope; passes through unchanged
-    * otherwise. Use via `flatTap` to keep the surrounding result value:
-    *
-    * {{{
-    * gateway.getOptions(ticker, creds).flatTap { r =>
-    *   YahooErrorMapping.raiseIfPresent[F](ticker, r.optionChain.error)
-    * }
-    * }}}
+  /** Raises the appropriate `YFinanceError` for an envelope failure on a ticker-context endpoint. `"Not Found"` →
+    * `TickerNotFound(ticker)`, `"Too Many Requests"` → `RateLimited(None)`, anything else → `DataParseError`.
     */
-  def raiseIfPresent[F[_]: MonadThrow](ticker: Ticker, error: Option[YahooErrorBody]): F[Unit] =
-    error match {
-      case Some(YahooErrorBody(NotFoundCode, _)) =>
+  def raiseFor[F[_]: MonadThrow, A](ticker: Ticker, error: YahooErrorBody): F[A] =
+    error.code match {
+      case NotFoundCode =>
         MonadThrow[F].raiseError(YFinanceError.TickerNotFound(ticker))
-      case Some(err) =>
+      case TooManyRequestsCode =>
+        MonadThrow[F].raiseError(YFinanceError.RateLimited(retryAfter = None))
+      case _ =>
         MonadThrow[F].raiseError(
-          YFinanceError.DataParseError(s"Yahoo query failed: ${err.code} - ${err.description}")
+          YFinanceError.DataParseError(s"Yahoo query failed: ${error.code} - ${error.description}")
         )
-      case None =>
-        MonadThrow[F].unit
+    }
+
+  /** Raises the appropriate `YFinanceError` for an envelope failure on an endpoint without a ticker context. `"Too Many
+    * Requests"` → `RateLimited(None)`, anything else (including `"Not Found"`, which is meaningless without a ticker) →
+    * `DataParseError` carrying the endpoint label.
+    */
+  def raiseGeneric[F[_]: MonadThrow, A](label: String, error: YahooErrorBody): F[A] =
+    error.code match {
+      case TooManyRequestsCode =>
+        MonadThrow[F].raiseError(YFinanceError.RateLimited(retryAfter = None))
+      case _ =>
+        MonadThrow[F].raiseError(
+          YFinanceError.DataParseError(s"Yahoo $label query failed: ${error.code} - ${error.description}")
+        )
     }
 }
