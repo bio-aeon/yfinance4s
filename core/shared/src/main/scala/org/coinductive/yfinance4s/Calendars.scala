@@ -199,27 +199,22 @@ private[yfinance4s] object Calendars {
     ): F[List[EarningsEvent]] =
       auth.getCredentials.flatMap { creds =>
         val body = buildMarketWideBody(start, end, config)
-        gateway.postVisualization(body, creds).flatMap(raiseOnError).flatMap(mapMarketWide)
+        gateway.postVisualization(body, creds, ticker = None).flatMap(mapMarketWide)
       }
 
     def getEarningsDates(ticker: Ticker, limit: Int, offset: Int): F[List[EarningsDate]] =
       auth.getCredentials.flatMap { creds =>
         val body = buildPerTickerBody(ticker, limit, offset)
-        gateway.postVisualization(body, creds).flatMap(raiseOnError).flatMap(mapPerTicker)
+        gateway.postVisualization(body, creds, ticker = Some(ticker)).flatMap(mapPerTicker)
       }
-
-    // --- Error escalation -------------------------------------------------
-
-    private def raiseOnError(r: YFinanceCalendarResult): F[YFinanceCalendarResult] =
-      r.error.fold(F.pure(r))(err => F.raiseError(err.toException))
 
     // --- Row mapping ------------------------------------------------------
     //
     // Structural fields (API-guaranteed) raise loudly when absent or malformed.
     // Soft fields (best-effort) fall through to Option when the value is null or the column is missing.
 
-    private def mapMarketWide(raw: YFinanceCalendarResult): F[List[EarningsEvent]] =
-      raw.rows.traverse(mapMarketWideRow(raw.columnIndex)).map(_.sorted(EarningsEvent.byDateAsc))
+    private def mapMarketWide(raw: Calendar): F[List[EarningsEvent]] =
+      raw.rows.traverse(mapMarketWideRow(raw.columnIndex)).map(_.sorted(using EarningsEvent.byDateAsc))
 
     private def mapMarketWideRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsEvent] =
       for {
@@ -245,8 +240,8 @@ private[yfinance4s] object Calendars {
         surprisePercent = optDouble(row, idx, Field.EpsSurprisePct)
       )
 
-    private def mapPerTicker(raw: YFinanceCalendarResult): F[List[EarningsDate]] =
-      raw.rows.traverse(mapPerTickerRow(raw.columnIndex)).map(_.sorted(EarningsDate.byDateDesc))
+    private def mapPerTicker(raw: Calendar): F[List[EarningsDate]] =
+      raw.rows.traverse(mapPerTickerRow(raw.columnIndex)).map(_.sorted(using EarningsDate.byDateDesc))
 
     private def mapPerTickerRow(idx: Map[String, Int])(row: CalendarRow): F[EarningsDate] =
       for {
@@ -278,19 +273,22 @@ private[yfinance4s] object Calendars {
     ): F[String] =
       idx.get(field).flatMap(row.stringAt) match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Missing required field '$field' in $context response row"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Missing required field '$field' in $context response row"))
       }
 
     private def parseZdt(s: String, field: String, context: String): F[ZonedDateTime] =
       parseZonedDateTime(s) match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Unparseable '$field' in $context response row: '$s'"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Unparseable '$field' in $context response row: '$s'"))
       }
 
     private def requireEnum[A](lookup: Option[A], raw: String, field: String, context: String): F[A] =
       lookup match {
         case Some(v) => F.pure(v)
-        case None    => F.raiseError(new Exception(s"Unknown '$field' value in $context response row: '$raw'"))
+        case None =>
+          F.raiseError(YFinanceError.DataParseError(s"Unknown '$field' value in $context response row: '$raw'"))
       }
 
     private def optString(row: CalendarRow, idx: Map[String, Int], field: String): Option[String] =

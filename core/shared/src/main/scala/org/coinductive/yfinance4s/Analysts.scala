@@ -71,21 +71,19 @@ private[yfinance4s] object Analysts {
 
     // --- Private Helpers ---
 
-    private def fetchAnalystData[A](ticker: Ticker)(extract: YFinanceAnalystResult => A): F[A] =
-      auth.getCredentials.flatMap { credentials =>
-        gateway.getAnalystData(ticker, credentials).map(extract)
-      }
+    private def fetchAnalystData[A](ticker: Ticker)(extract: AnalystQuoteSummary => A): F[A] =
+      auth.getCredentials.flatMap(creds => gateway.getAnalystData(ticker, creds).map(extract))
 
-    private def analystQuoteData(result: YFinanceAnalystResult): Option[AnalystQuoteData] =
-      result.quoteSummary.result.headOption
+    private def analystQuoteData(result: AnalystQuoteSummary): Option[AnalystQuoteData] =
+      result.result.headOption
 
-    private def earningsTrendEntries(result: YFinanceAnalystResult): List[EarningsTrendEntryRaw] =
+    private def earningsTrendEntries(result: AnalystQuoteSummary): List[EarningsTrendEntryRaw] =
       analystQuoteData(result).flatMap(_.earningsTrend).flatMap(_.trend).getOrElse(List.empty)
 
-    private def extractPriceTargets(result: YFinanceAnalystResult): Option[AnalystPriceTargets] =
+    private def extractPriceTargets(result: AnalystQuoteSummary): Option[AnalystPriceTargets] =
       analystQuoteData(result).flatMap(_.financialData).flatMap(mapPriceTargets)
 
-    private def extractRecommendations(result: YFinanceAnalystResult): List[RecommendationTrend] =
+    private def extractRecommendations(result: AnalystQuoteSummary): List[RecommendationTrend] =
       analystQuoteData(result)
         .flatMap(_.recommendationTrend)
         .flatMap(_.trend)
@@ -93,7 +91,7 @@ private[yfinance4s] object Analysts {
         .flatMap(mapRecommendationTrend)
         .sorted
 
-    private def extractUpgradeDowngrades(result: YFinanceAnalystResult): List[UpgradeDowngrade] =
+    private def extractUpgradeDowngrades(result: AnalystQuoteSummary): List[UpgradeDowngrade] =
       analystQuoteData(result)
         .flatMap(_.upgradeDowngradeHistory)
         .flatMap(_.history)
@@ -101,19 +99,19 @@ private[yfinance4s] object Analysts {
         .flatMap(mapUpgradeDowngrade)
         .sorted
 
-    private def extractEarningsEstimates(result: YFinanceAnalystResult): List[EarningsEstimate] =
+    private def extractEarningsEstimates(result: AnalystQuoteSummary): List[EarningsEstimate] =
       earningsTrendEntries(result).flatMap(mapEarningsEstimate).sorted
 
-    private def extractRevenueEstimates(result: YFinanceAnalystResult): List[RevenueEstimate] =
+    private def extractRevenueEstimates(result: AnalystQuoteSummary): List[RevenueEstimate] =
       earningsTrendEntries(result).flatMap(mapRevenueEstimate).sorted
 
-    private def extractEpsTrends(result: YFinanceAnalystResult): List[EpsTrend] =
+    private def extractEpsTrends(result: AnalystQuoteSummary): List[EpsTrend] =
       earningsTrendEntries(result).flatMap(mapEpsTrend).sorted
 
-    private def extractEpsRevisionsList(result: YFinanceAnalystResult): List[EpsRevisions] =
+    private def extractEpsRevisionsList(result: AnalystQuoteSummary): List[EpsRevisions] =
       earningsTrendEntries(result).flatMap(mapEpsRevisions).sorted
 
-    private def extractEarningsHistoryEntries(result: YFinanceAnalystResult): List[EarningsHistory] =
+    private def extractEarningsHistoryEntries(result: AnalystQuoteSummary): List[EarningsHistory] =
       analystQuoteData(result)
         .flatMap(_.earningsHistory)
         .flatMap(_.history)
@@ -121,7 +119,7 @@ private[yfinance4s] object Analysts {
         .flatMap(mapEarningsHistoryEntry)
         .sorted
 
-    private def extractGrowthEstimates(result: YFinanceAnalystResult): List[GrowthEstimates] = {
+    private def extractGrowthEstimates(result: AnalystQuoteSummary): List[GrowthEstimates] = {
       val data = analystQuoteData(result)
       val indexTrend = data.flatMap(_.indexTrend)
       val indexSymbol = indexTrend.flatMap(_.symbol)
@@ -143,7 +141,7 @@ private[yfinance4s] object Analysts {
       }.sorted
     }
 
-    private def mapToAnalystData(result: YFinanceAnalystResult): Option[AnalystData] =
+    private def mapToAnalystData(result: AnalystQuoteSummary): Option[AnalystData] =
       analystQuoteData(result).map { _ =>
         AnalystData(
           priceTargets = extractPriceTargets(result),

@@ -3,8 +3,7 @@ package org.coinductive.yfinance4s
 import cats.Functor
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.*
-import org.coinductive.yfinance4s.models.internal.{YFinanceQueryResult, YFinanceQuoteResult}
-import org.coinductive.yfinance4s.models.internal.YFinanceQueryResult.InstrumentData
+import org.coinductive.yfinance4s.models.internal.{Chart, InstrumentData, YFinanceQuoteResult}
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
@@ -70,14 +69,14 @@ private[yfinance4s] object Charts {
   ) extends Charts[F] {
 
     def getChart(ticker: Ticker, interval: Interval, range: Range): F[Option[ChartResult]] =
-      gateway.getChart(ticker, interval, range).map(mapQueryResult)
+      gateway.getChart(ticker, interval, range).map(mapChart)
 
     def getChart(
         ticker: Ticker,
         interval: Interval,
         since: ZonedDateTime,
         until: ZonedDateTime
-    ): F[Option[ChartResult]] = gateway.getChart(ticker, interval, since, until).map(mapQueryResult)
+    ): F[Option[ChartResult]] = gateway.getChart(ticker, interval, since, until).map(mapChart)
 
     def getStock(ticker: Ticker): F[Option[StockResult]] =
       scrapper.getQuote(ticker).map(_.flatMap(mapQuoteResult))
@@ -117,8 +116,8 @@ private[yfinance4s] object Charts {
 
     // --- Private Mapping Helpers ---
 
-    private def mapQueryResult(result: YFinanceQueryResult): Option[ChartResult] =
-      result.chart.result.headOption.map { data =>
+    private def mapChart(chart: Chart): Option[ChartResult] =
+      chart.result.headOption.map { data =>
         val quotes = data.timestamp.indices.map { i =>
           val quote = data.indicators.quote.head
           val adjclose = data.indicators.adjclose.head
@@ -139,14 +138,14 @@ private[yfinance4s] object Charts {
         ChartResult(quotes, dividends, splits)
       }
 
-    private def extractDividends(result: YFinanceQueryResult): Option[List[DividendEvent]] =
-      result.chart.result.headOption.map(extractDividendsFromData)
+    private def extractDividends(chart: Chart): Option[List[DividendEvent]] =
+      chart.result.headOption.map(extractDividendsFromData)
 
-    private def extractSplits(result: YFinanceQueryResult): Option[List[SplitEvent]] =
-      result.chart.result.headOption.map(extractSplitsFromData)
+    private def extractSplits(chart: Chart): Option[List[SplitEvent]] =
+      chart.result.headOption.map(extractSplitsFromData)
 
-    private def extractCorporateActions(result: YFinanceQueryResult): Option[CorporateActions] =
-      result.chart.result.headOption.map { data =>
+    private def extractCorporateActions(chart: Chart): Option[CorporateActions] =
+      chart.result.headOption.map { data =>
         CorporateActions(
           dividends = extractDividendsFromData(data),
           splits = extractSplitsFromData(data)

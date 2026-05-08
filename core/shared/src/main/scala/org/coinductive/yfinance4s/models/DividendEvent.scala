@@ -1,6 +1,6 @@
 package org.coinductive.yfinance4s.models
 
-import org.coinductive.yfinance4s.models.internal.YFinanceQueryResult.DividendEventRaw
+import org.coinductive.yfinance4s.models.internal.DividendEventRaw
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 

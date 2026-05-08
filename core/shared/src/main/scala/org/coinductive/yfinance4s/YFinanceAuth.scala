@@ -3,7 +3,8 @@ package org.coinductive.yfinance4s
 import cats.effect.{Async, Ref, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import retry.{RetryPolicies, RetryPolicy, Sleep}
+import org.coinductive.yfinance4s.models.YFinanceError
+import retry.{RetryPolicies, RetryPolicy, Sleep, retryingOnSomeErrors}
 import sttp.client3.*
 import sttp.model.Header
 
@@ -121,17 +122,19 @@ private object YFinanceAuth {
         .followRedirects(true)
         .response(asString)
 
-      retry
-        .retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-          rateLimiter.acquire(request.send(sttpBackend))
-        }
-        .map { response =>
-          response.headers
-            .filter(_.name.equalsIgnoreCase("Set-Cookie"))
-            .map(_.value)
-            .map(extractCookieNameValue)
-            .toList
-        }
+      retryingOnSomeErrors(
+        policy = retryPolicy,
+        isWorthRetrying = HTTPBase.isRetriable[F],
+        onError = HTTPBase.onErrorSleep[F]
+      ) {
+        rateLimiter.acquire(F.adaptError(request.send(sttpBackend)) { case t => HTTPBase.toNetworkError(t) })
+      }.map { response =>
+        response.headers
+          .filter(_.name.equalsIgnoreCase("Set-Cookie"))
+          .map(_.value)
+          .map(extractCookieNameValue)
+          .toList
+      }
     }
 
     private def fetchCrumb(cookies: List[String]): F[String] = {
@@ -143,21 +146,28 @@ private object YFinanceAuth {
         .followRedirects(true)
         .response(asString)
 
-      retry
-        .retryingOnAllErrors(policy = retryPolicy, (_: Throwable, _) => F.unit) {
-          rateLimiter.acquire(request.send(sttpBackend))
-        }
-        .flatMap { response =>
-          response.body match {
-            case Right(crumb) if !crumb.contains("Too Many Requests") && crumb.nonEmpty =>
-              F.pure(crumb.trim)
-            case Right(errorBody) =>
-              F.raiseError(new Exception(s"Failed to fetch crumb: $errorBody"))
-            case Left(error) =>
-              F.raiseError(new Exception(s"Failed to fetch crumb: $error"))
-          }
-        }
+      retryingOnSomeErrors(
+        policy = retryPolicy,
+        isWorthRetrying = HTTPBase.isRetriable[F],
+        onError = HTTPBase.onErrorSleep[F]
+      ) {
+        rateLimiter
+          .acquire(F.adaptError(request.send(sttpBackend)) { case t => HTTPBase.toNetworkError(t) })
+          .flatMap(parseCrumbBody)
+      }
     }
+
+    private def parseCrumbBody(response: Response[Either[String, String]]): F[String] =
+      response.body match {
+        case Right(crumb) if crumb.contains(YahooErrorMapping.TooManyRequestsCode) =>
+          F.raiseError(YFinanceError.RateLimited(retryAfter = None))
+        case Right(crumb) if crumb.trim.isEmpty =>
+          F.raiseError(YFinanceError.DataParseError("Yahoo crumb endpoint returned empty body"))
+        case Right(crumb) =>
+          F.pure(crumb.trim)
+        case Left(error) =>
+          F.raiseError(YFinanceError.DataParseError(s"Yahoo crumb endpoint failed: $error"))
+      }
 
     private def extractCookieNameValue(setCookie: String): String = {
       setCookie.split(";").headOption.getOrElse(setCookie)

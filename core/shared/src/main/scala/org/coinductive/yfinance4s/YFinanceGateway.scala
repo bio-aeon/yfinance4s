@@ -2,6 +2,8 @@ package org.coinductive.yfinance4s
 
 import cats.effect.{Async, Resource, Sync}
 import cats.syntax.show.*
+import io.circe.{Decoder, Json}
+import io.circe.parser.decode
 import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.internal.*
 import retry.{RetryPolicies, RetryPolicy, Sleep}
@@ -11,24 +13,24 @@ import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.FiniteDuration
 
 sealed trait YFinanceGateway[F[_]] {
-  def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult]
+  def getChart(ticker: Ticker, interval: Interval, range: Range): F[Chart]
 
   def getChart(
       ticker: Ticker,
       interval: Interval,
       since: ZonedDateTime,
       until: ZonedDateTime
-  ): F[YFinanceQueryResult]
+  ): F[Chart]
 
-  def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
+  def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[OptionChainResponse]
 
-  def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult]
+  def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[OptionChainResponse]
 
-  def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult]
+  def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[HoldersQuoteSummary]
 
   def getFinancials(ticker: Ticker, frequency: Frequency, statementType: String = "all"): F[YFinanceFinancialsResult]
 
-  def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult]
+  def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[AnalystQuoteSummary]
 
   def search(query: String, quotesCount: Int, newsCount: Int, enableFuzzyQuery: Boolean): F[YFinanceSearchResult]
 
@@ -50,7 +52,16 @@ sealed trait YFinanceGateway[F[_]] {
       credentials: YFinanceCredentials
   ): F[YFinanceTrendingResult]
 
-  def postVisualization(body: String, credentials: YFinanceCredentials): F[YFinanceCalendarResult]
+  /** Posts a visualization query. The optional `ticker` selects the failure-mapping policy: when `Some(t)`, an envelope
+    * failure with `error.code == "Not Found"` becomes `TickerNotFound(t)`; when `None` (market-wide queries), any
+    * non-rate-limit failure becomes `DataParseError`. Yahoo's actual `POST /v1/finance/visualization` endpoint is the
+    * same regardless.
+    */
+  def postVisualization(
+      body: String,
+      credentials: YFinanceCredentials,
+      ticker: Option[Ticker]
+  ): F[Calendar]
 }
 
 private object YFinanceGateway {
@@ -111,6 +122,11 @@ private object YFinanceGateway {
 
     private val VisualizationEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/visualization"
 
+    private val ChartPath = "chart"
+    private val OptionChainPath = "optionChain"
+    private val QuoteSummaryPath = "quoteSummary"
+    private val FinancePath = "finance"
+
     private val VisualizationQueryParams = Map(
       "lang" -> "en-US",
       "region" -> "US"
@@ -149,7 +165,7 @@ private object YFinanceGateway {
       "region" -> "US"
     )
 
-    def getChart(ticker: Ticker, interval: Interval, range: Range): F[YFinanceQueryResult] = {
+    def getChart(ticker: Ticker, interval: Interval, range: Range): F[Chart] = {
       val req =
         basicRequest.get(
           ChartApiEndpoint
@@ -157,7 +173,7 @@ private object YFinanceGateway {
             .withParams(("interval", interval.show), ("range", range.show), ("events", "div,split"))
         )
 
-      sendRequest(req, parseAs[YFinanceQueryResult]("chart"))
+      sendRequest(req, parseTickerEnvelope[Chart](ChartPath, "chart", ticker))
     }
 
     def getChart(
@@ -165,7 +181,7 @@ private object YFinanceGateway {
         interval: Interval,
         since: ZonedDateTime,
         until: ZonedDateTime
-    ): F[YFinanceQueryResult] = {
+    ): F[Chart] = {
       val req =
         basicRequest.get(
           ChartApiEndpoint
@@ -178,10 +194,10 @@ private object YFinanceGateway {
             )
         )
 
-      sendRequest(req, parseAs[YFinanceQueryResult]("chart"))
+      sendRequest(req, parseTickerEnvelope[Chart](ChartPath, "chart", ticker))
     }
 
-    def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
+    def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[OptionChainResponse] = {
       val req = basicRequest
         .get(
           OptionsApiEndpoint
@@ -191,10 +207,10 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAs[YFinanceOptionsResult]("options"))
+      sendRequest(req, parseTickerEnvelope[OptionChainResponse](OptionChainPath, "options", ticker))
     }
 
-    def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[YFinanceOptionsResult] = {
+    def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[OptionChainResponse] = {
       val req = basicRequest
         .get(
           OptionsApiEndpoint
@@ -204,10 +220,10 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAs[YFinanceOptionsResult]("options"))
+      sendRequest(req, parseTickerEnvelope[OptionChainResponse](OptionChainPath, "options", ticker))
     }
 
-    def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceHoldersResult] = {
+    def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[HoldersQuoteSummary] = {
       val req = basicRequest
         .get(
           QuoteSummaryEndpoint
@@ -221,7 +237,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAs[YFinanceHoldersResult]("holders"))
+      sendRequest(req, parseTickerEnvelope[HoldersQuoteSummary](QuoteSummaryPath, "holders", ticker))
     }
 
     def getFinancials(
@@ -254,7 +270,7 @@ private object YFinanceGateway {
       sendRequest(req, parseAs[YFinanceFinancialsResult]("financials"))
     }
 
-    def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[YFinanceAnalystResult] = {
+    def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[AnalystQuoteSummary] = {
       val req = basicRequest
         .get(
           QuoteSummaryEndpoint
@@ -268,7 +284,7 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAs[YFinanceAnalystResult]("analyst"))
+      sendRequest(req, parseTickerEnvelope[AnalystQuoteSummary](QuoteSummaryPath, "analyst", ticker))
     }
 
     def search(
@@ -394,7 +410,11 @@ private object YFinanceGateway {
       sendRequest(req, parseAs[YFinanceTrendingResult]("trending"))
     }
 
-    def postVisualization(body: String, credentials: YFinanceCredentials): F[YFinanceCalendarResult] = {
+    def postVisualization(
+        body: String,
+        credentials: YFinanceCredentials,
+        ticker: Option[Ticker]
+    ): F[Calendar] = {
       val params = VisualizationQueryParams ++ Map("crumb" -> credentials.crumb)
       val req = basicRequest
         .post(VisualizationEndpoint.withParams(params))
@@ -403,8 +423,38 @@ private object YFinanceGateway {
         .headers(YFinanceAuth.apiHeaders *)
         .header("Cookie", credentials.cookies.mkString("; "))
 
-      sendRequest(req, parseAs[YFinanceCalendarResult]("calendar"))
+      val parser: String => F[Calendar] = ticker match {
+        case Some(t) => parseTickerEnvelope[Calendar](FinancePath, "calendar", t)
+        case None    => parseGenericEnvelope[Calendar](FinancePath, "calendar")
+      }
+      sendRequest(req, parser)
     }
+
+    // --- Envelope helpers --------------------------------------------------
+
+    private def parseTickerEnvelope[A: Decoder](path: String, label: String, ticker: Ticker)(content: String): F[A] =
+      parseEnvelope[A](path, label, err => YahooErrorMapping.raiseFor[F, A](ticker, err))(content)
+
+    private def parseGenericEnvelope[A: Decoder](path: String, label: String)(content: String): F[A] =
+      parseEnvelope[A](path, label, err => YahooErrorMapping.raiseGeneric[F, A](label, err))(content)
+
+    private def parseEnvelope[A: Decoder](
+        path: String,
+        label: String,
+        onFailure: YahooErrorBody => F[A]
+    )(content: String): F[A] =
+      decode[Json](content).fold(
+        e => F.raiseError(YFinanceError.DataParseError(s"Failed to parse $label response: ${e.getMessage}", Some(e))),
+        json =>
+          json.hcursor.downField(path).as[YahooResponse[A]] match {
+            case Right(YahooResponse.Success(a))   => F.pure(a)
+            case Right(YahooResponse.Failure(err)) => onFailure(err)
+            case Left(err) =>
+              F.raiseError(
+                YFinanceError.DataParseError(s"Failed to decode $label response: ${err.getMessage}", Some(err))
+              )
+          }
+      )
 
   }
 

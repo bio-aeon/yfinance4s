@@ -71,7 +71,7 @@ class MarketSummarySpec extends FunSuite {
     val a = gspcQuote.copy(symbol = "A", regularMarketChangePercent = Some(0.01))
     val b = gspcQuote.copy(symbol = "B", regularMarketChangePercent = Some(0.05))
     val c = gspcQuote.copy(symbol = "C", regularMarketChangePercent = Some(-0.02))
-    val sorted = List(a, b, c).sorted(MarketIndexQuote.byChangePercentDesc)
+    val sorted = List(a, b, c).sorted(using MarketIndexQuote.byChangePercentDesc)
     assertEquals(sorted.map(_.symbol), List("B", "A", "C"))
   }
 
@@ -79,7 +79,7 @@ class MarketSummarySpec extends FunSuite {
     val a = gspcQuote.copy(symbol = "A", regularMarketChangePercent = None)
     val b = gspcQuote.copy(symbol = "B", regularMarketChangePercent = Some(0.05))
     val c = gspcQuote.copy(symbol = "C", regularMarketChangePercent = Some(-0.02))
-    val sorted = List(a, b, c).sorted(MarketIndexQuote.byChangePercentDesc)
+    val sorted = List(a, b, c).sorted(using MarketIndexQuote.byChangePercentDesc)
     assertEquals(sorted.map(_.symbol), List("B", "C", "A"))
   }
 

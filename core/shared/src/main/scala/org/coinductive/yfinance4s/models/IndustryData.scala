@@ -54,7 +54,7 @@ final case class TopPerformingCompany(
 
 object TopPerformingCompany {
   implicit val ordering: Ordering[TopPerformingCompany] =
-    Ordering.by[TopPerformingCompany, Option[Double]](_.ytdReturn)(Ordering[Option[Double]].reverse)
+    Ordering.by[TopPerformingCompany, Option[Double]](_.ytdReturn)(using Ordering[Option[Double]].reverse)
 }
 
 // --- Top growth companies ---
@@ -76,7 +76,7 @@ final case class TopGrowthCompany(
 
 object TopGrowthCompany {
   implicit val ordering: Ordering[TopGrowthCompany] =
-    Ordering.by[TopGrowthCompany, Option[Double]](_.growthEstimate)(Ordering[Option[Double]].reverse)
+    Ordering.by[TopGrowthCompany, Option[Double]](_.growthEstimate)(using Ordering[Option[Double]].reverse)
 }
 
 // --- Top-level aggregate ---
@@ -122,7 +122,7 @@ final case class IndustryData(
 
   /** Top N companies by market weight (descending). */
   def topCompaniesByWeight(n: Int): List[TopCompany] =
-    topCompanies.sortBy(_.marketWeight)(Ordering[Option[Double]].reverse).take(n)
+    topCompanies.sortBy(_.marketWeight)(using Ordering[Option[Double]].reverse).take(n)
 
   /** Top N performers by YTD return (descending). */
   def topPerformersByYtd(n: Int): List[TopPerformingCompany] =

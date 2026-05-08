@@ -4,19 +4,7 @@ import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
 import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult.Value
 
-/** Raw API response for holders data from Quote Summary endpoint. */
-private[yfinance4s] final case class YFinanceHoldersResult(
-    quoteSummary: HoldersQuoteSummary
-)
-
-private[yfinance4s] object YFinanceHoldersResult {
-  implicit val decoder: Decoder[YFinanceHoldersResult] = deriveDecoder
-}
-
-private[yfinance4s] final case class HoldersQuoteSummary(
-    result: List[HoldersQuoteData],
-    error: Option[String]
-)
+private[yfinance4s] final case class HoldersQuoteSummary(result: List[HoldersQuoteData])
 
 private[yfinance4s] object HoldersQuoteSummary {
   implicit val decoder: Decoder[HoldersQuoteSummary] = deriveDecoder

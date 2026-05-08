@@ -3,16 +3,7 @@ package org.coinductive.yfinance4s.models.internal
 import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
 
-private[yfinance4s] final case class YFinanceOptionsResult(optionChain: OptionChainResponse)
-
-private[yfinance4s] object YFinanceOptionsResult {
-  implicit val decoder: Decoder[YFinanceOptionsResult] = deriveDecoder
-}
-
-private[yfinance4s] final case class OptionChainResponse(
-    result: List[OptionDataRaw],
-    error: Option[String]
-)
+private[yfinance4s] final case class OptionChainResponse(result: List[OptionDataRaw])
 
 private[yfinance4s] object OptionChainResponse {
   implicit val decoder: Decoder[OptionChainResponse] = deriveDecoder

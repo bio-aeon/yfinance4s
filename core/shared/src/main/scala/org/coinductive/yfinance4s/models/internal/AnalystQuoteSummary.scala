@@ -4,20 +4,7 @@ import io.circe.{Decoder, HCursor}
 import io.circe.generic.semiauto.deriveDecoder
 import org.coinductive.yfinance4s.models.internal.YFinanceQuoteResult.Value
 
-// --- Top-level result wrapper ---
-
-private[yfinance4s] final case class YFinanceAnalystResult(
-    quoteSummary: AnalystQuoteSummary
-)
-
-private[yfinance4s] object YFinanceAnalystResult {
-  implicit val decoder: Decoder[YFinanceAnalystResult] = deriveDecoder
-}
-
-private[yfinance4s] final case class AnalystQuoteSummary(
-    result: List[AnalystQuoteData],
-    error: Option[String]
-)
+private[yfinance4s] final case class AnalystQuoteSummary(result: List[AnalystQuoteData])
 
 private[yfinance4s] object AnalystQuoteSummary {
   implicit val decoder: Decoder[AnalystQuoteSummary] = deriveDecoder
