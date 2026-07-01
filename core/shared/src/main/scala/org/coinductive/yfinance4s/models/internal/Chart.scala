@@ -15,6 +15,7 @@ private[yfinance4s] object Chart {
 }
 
 private[yfinance4s] final case class InstrumentData(
+    meta: Option[ChartMetaRaw],
     timestamp: List[Long],
     indicators: Indicators,
     events: Option[Events]
@@ -22,6 +23,52 @@ private[yfinance4s] final case class InstrumentData(
 
 private[yfinance4s] object InstrumentData {
   implicit val decoder: Decoder[InstrumentData] = deriveDecoder
+}
+
+private[yfinance4s] final case class ChartMetaRaw(
+    currency: String,
+    symbol: String,
+    exchangeName: String,
+    fullExchangeName: Option[String],
+    instrumentType: String,
+    firstTradeDate: Option[Long],
+    regularMarketTime: Option[Long],
+    gmtoffset: Long,
+    timezone: String,
+    exchangeTimezoneName: String,
+    regularMarketPrice: Option[Double],
+    chartPreviousClose: Option[Double],
+    priceHint: Option[Int],
+    currentTradingPeriod: Option[TradingPeriodsRaw],
+    dataGranularity: String,
+    range: String,
+    validRanges: Option[List[String]],
+    hasPrePostMarketData: Option[Boolean]
+)
+
+private[yfinance4s] object ChartMetaRaw {
+  implicit val decoder: Decoder[ChartMetaRaw] = deriveDecoder
+}
+
+private[yfinance4s] final case class TradingPeriodsRaw(
+    pre: Option[TradingPeriodRaw],
+    regular: Option[TradingPeriodRaw],
+    post: Option[TradingPeriodRaw]
+)
+
+private[yfinance4s] object TradingPeriodsRaw {
+  implicit val decoder: Decoder[TradingPeriodsRaw] = deriveDecoder
+}
+
+private[yfinance4s] final case class TradingPeriodRaw(
+    timezone: String,
+    start: Long,
+    end: Long,
+    gmtoffset: Long
+)
+
+private[yfinance4s] object TradingPeriodRaw {
+  implicit val decoder: Decoder[TradingPeriodRaw] = deriveDecoder
 }
 
 private[yfinance4s] final case class Indicators(quote: NonEmptyList[Quote], adjclose: NonEmptyList[AdjClose])

@@ -39,6 +39,7 @@ class TickersSpec extends FunSuite {
         since: ZonedDateTime,
         until: ZonedDateTime
     ): Option[CorporateActions] = ???
+    def getHistoryMetadata(ticker: Ticker): HistoryMetadata = ???
   }
 
   private val stubOptions: Options[Id] = new Options[Id] {

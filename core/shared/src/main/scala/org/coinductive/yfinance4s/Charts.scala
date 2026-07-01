@@ -1,6 +1,7 @@
 package org.coinductive.yfinance4s
 
-import cats.Functor
+import cats.MonadThrow
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import org.coinductive.yfinance4s.models.*
 import org.coinductive.yfinance4s.models.internal.{Chart, InstrumentData, YFinanceQuoteResult}
@@ -56,14 +57,24 @@ trait Charts[F[_]] {
       since: ZonedDateTime,
       until: ZonedDateTime
   ): F[Option[CorporateActions]]
+
+  /** Retrieves instrument-level history metadata for a ticker: exchange and timezone, instrument type, trading
+    * currency, current trading-session windows, last price, and the ranges Yahoo accepts for the symbol. Sourced from
+    * Yahoo's chart endpoint. Raises [[models.YFinanceError.TickerNotFound]] for an unknown ticker and
+    * [[models.YFinanceError.DataParseError]] if the metadata is missing or malformed.
+    */
+  def getHistoryMetadata(ticker: Ticker): F[HistoryMetadata]
 }
 
 private[yfinance4s] object Charts {
 
-  def apply[F[_]: Functor](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
+  private val MetadataInterval: Interval = Interval.`1Day`
+  private val MetadataRange: Range = Range.`1Month`
+
+  def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
     new ChartsImpl(gateway, scrapper)
 
-  private final class ChartsImpl[F[_]: Functor](
+  private final class ChartsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F]
   ) extends Charts[F] {
@@ -114,7 +125,25 @@ private[yfinance4s] object Charts {
     ): F[Option[CorporateActions]] =
       gateway.getChart(ticker, interval, since, until).map(extractCorporateActions)
 
+    def getHistoryMetadata(ticker: Ticker): F[HistoryMetadata] =
+      gateway.getChart(ticker, MetadataInterval, MetadataRange).flatMap(extractMetadata(ticker, _))
+
     // --- Private Mapping Helpers ---
+
+    private def extractMetadata(ticker: Ticker, chart: Chart): F[HistoryMetadata] =
+      chart.result.headOption.flatMap(_.meta) match {
+        case Some(raw) =>
+          HistoryMetadata
+            .fromRaw(raw)
+            .fold(
+              msg => MonadThrow[F].raiseError(YFinanceError.DataParseError(msg)),
+              MonadThrow[F].pure
+            )
+        case None =>
+          MonadThrow[F].raiseError(
+            YFinanceError.DataParseError(s"Chart response for ${ticker.value} contained no history metadata")
+          )
+      }
 
     private def mapChart(chart: Chart): Option[ChartResult] =
       chart.result.headOption.map { data =>
