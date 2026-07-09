@@ -93,7 +93,7 @@ pacing compose independently - both limits apply.
 The client exposes domain-specific modules:
 
 ```scala
-client.charts      // historical data, quotes, dividends, splits
+client.charts      // historical data (with opt-in price repair), quotes, dividends, splits
 client.options     // option chains and expirations
 client.holders     // institutional, mutual fund, and insider data
 client.financials  // income statements, balance sheets, cash flows

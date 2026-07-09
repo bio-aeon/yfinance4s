@@ -11,15 +11,31 @@ import java.time.{Instant, ZoneOffset, ZonedDateTime}
 /** Algebra for historical chart data, stock quotes, and corporate actions. */
 trait Charts[F[_]] {
 
-  /** Retrieves historical chart data (OHLCV) for a ticker by range. */
-  def getChart(ticker: Ticker, interval: Interval, range: Range): F[Option[ChartResult]]
+  /** Retrieves historical chart data (OHLCV) for a ticker by range, optionally applying price repair (see
+    * [[models.PriceRepairConfig]]).
+    */
+  def getChart(
+      ticker: Ticker,
+      interval: Interval,
+      range: Range,
+      repair: PriceRepairConfig = PriceRepairConfig.Disabled
+  ): F[Option[ChartResult]]
 
-  /** Retrieves historical chart data (OHLCV) for a ticker by date range. */
+  /** Retrieves historical chart data (OHLCV) for a ticker by date range, without price repair. */
   def getChart(
       ticker: Ticker,
       interval: Interval,
       since: ZonedDateTime,
       until: ZonedDateTime
+  ): F[Option[ChartResult]]
+
+  /** Retrieves historical chart data (OHLCV) for a ticker by date range, applying the given price repair. */
+  def getChart(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime,
+      repair: PriceRepairConfig
   ): F[Option[ChartResult]]
 
   /** Retrieves current quote with fundamentals for a ticker. */
@@ -72,22 +88,37 @@ private[yfinance4s] object Charts {
   private val MetadataRange: Range = Range.`1Month`
 
   def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
-    new ChartsImpl(gateway, scrapper)
+    new ChartsImpl(gateway, scrapper, IntervalReconstructor.noOp[F])
 
   private final class ChartsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
-      scrapper: YFinanceScrapper[F]
+      scrapper: YFinanceScrapper[F],
+      reconstructor: IntervalReconstructor[F]
   ) extends Charts[F] {
 
-    def getChart(ticker: Ticker, interval: Interval, range: Range): F[Option[ChartResult]] =
-      gateway.getChart(ticker, interval, range).map(mapChart)
+    def getChart(
+        ticker: Ticker,
+        interval: Interval,
+        range: Range,
+        repair: PriceRepairConfig
+    ): F[Option[ChartResult]] =
+      gateway.getChart(ticker, interval, range).flatMap(mapAndRepair(ticker, interval, repair, _))
 
     def getChart(
         ticker: Ticker,
         interval: Interval,
         since: ZonedDateTime,
         until: ZonedDateTime
-    ): F[Option[ChartResult]] = gateway.getChart(ticker, interval, since, until).map(mapChart)
+    ): F[Option[ChartResult]] = getChart(ticker, interval, since, until, PriceRepairConfig.Disabled)
+
+    def getChart(
+        ticker: Ticker,
+        interval: Interval,
+        since: ZonedDateTime,
+        until: ZonedDateTime,
+        repair: PriceRepairConfig
+    ): F[Option[ChartResult]] =
+      gateway.getChart(ticker, interval, since, until).flatMap(mapAndRepair(ticker, interval, repair, _))
 
     def getStock(ticker: Ticker): F[Option[StockResult]] =
       scrapper.getQuote(ticker).map(_.flatMap(mapQuoteResult))
@@ -143,6 +174,28 @@ private[yfinance4s] object Charts {
           MonadThrow[F].raiseError(
             YFinanceError.DataParseError(s"Chart response for ${ticker.value} contained no history metadata")
           )
+      }
+
+    private def mapAndRepair(
+        ticker: Ticker,
+        interval: Interval,
+        repair: PriceRepairConfig,
+        chart: Chart
+    ): F[Option[ChartResult]] =
+      PriceRepairConfig.resolve(repair) match {
+        case PriceRepairConfig.Custom(false, false) =>
+          MonadThrow[F].pure(mapChart(chart)) // fast path: byte-identical to the unrepaired mapping
+        case cfg =>
+          PriceRepair.prepare(chart, ticker, interval, cfg) match {
+            case None =>
+              MonadThrow[F].pure(None)
+            case Some(prepared) if prepared.tags.isEmpty =>
+              MonadThrow[F].pure(Some(PriceRepair.complete(prepared, PriceRepair.Reconstruction.empty)))
+            case Some(prepared) =>
+              reconstructor
+                .reconstruct(ticker, interval, prepared.bars, prepared.tags)
+                .map(recon => Some(PriceRepair.complete(prepared, recon)))
+          }
       }
 
     private def mapChart(chart: Chart): Option[ChartResult] =

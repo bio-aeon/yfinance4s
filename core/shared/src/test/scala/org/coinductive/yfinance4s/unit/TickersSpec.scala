@@ -14,9 +14,17 @@ class TickersSpec extends FunSuite {
     * exercise pure operations on Tickers (add, remove, contains, etc.).
     */
   private val stubCharts: Charts[Id] = new Charts[Id] {
-    def getChart(ticker: Ticker, interval: Interval, range: Range): Option[ChartResult] = ???
+    def getChart(ticker: Ticker, interval: Interval, range: Range, repair: PriceRepairConfig): Option[ChartResult] =
+      ???
     def getChart(ticker: Ticker, interval: Interval, since: ZonedDateTime, until: ZonedDateTime): Option[ChartResult] =
       ???
+    def getChart(
+        ticker: Ticker,
+        interval: Interval,
+        since: ZonedDateTime,
+        until: ZonedDateTime,
+        repair: PriceRepairConfig
+    ): Option[ChartResult] = ???
     def getStock(ticker: Ticker): Option[StockResult] = ???
     def getDividends(ticker: Ticker, interval: Interval, range: Range): Option[List[DividendEvent]] = ???
     def getDividends(

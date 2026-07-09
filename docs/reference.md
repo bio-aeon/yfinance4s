@@ -55,12 +55,19 @@
 - `Enabled(maxRequestsPerSecond)` - interval-based pacing; request starts are spaced no closer than `1.second / maxRequestsPerSecond` apart, with no burst capacity
 - `Default` - `Enabled(maxRequestsPerSecond = 2)`
 
+**PriceRepairConfig** - Opt-in currency-unit price repair, passed per `getChart` call (not client-wide):
+- `Disabled` - Yahoo's bars verbatim (the default)
+- `Enabled` - every repair the library can currently perform
+- `Custom(fix100xErrors, fixZeroes)` - selective repair; `fix100xErrors` covers both sporadic 100x outliers and systematic unit switches, `fixZeroes` is detection-only until interval reconstruction lands
+
+Repair applies to daily and intraday intervals only; it is best-effort and never fails the request. Bars altered by repair carry `repaired = true`.
+
 ## Data Models
 
 ### Charts
 
 **ChartResult** - Historical OHLCV data and corporate actions:
-- `quotes`: List of OHLCV price quotes (datetime, open, high, low, close, volume, adjclose)
+- `quotes`: List of OHLCV price quotes (datetime, open, high, low, close, volume, adjclose, repaired - true when price repair altered the bar)
 - `dividends`: List of dividend events within the chart period
 - `splits`: List of stock split events within the chart period
 - `corporateActions`: Combined dividends and splits as `CorporateActions`

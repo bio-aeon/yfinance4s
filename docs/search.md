@@ -11,7 +11,7 @@ clientResource.use { client =>
       println(s"${q.symbol}: ${q.displayName} (${q.quoteType.getOrElse("N/A")})")
     }
     result.news.foreach { n =>
-      println(s"${n.title} — ${n.publisher}")
+      println(s"${n.title} - ${n.publisher}")
     }
   }
 }

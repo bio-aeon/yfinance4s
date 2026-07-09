@@ -6,6 +6,7 @@ Effectful Yahoo Finance client in the Scala programming language.
 
 - **Historical Data**: OHLCV price data with configurable intervals and date ranges
 - **Corporate Actions**: Dividend and stock split history
+- **Price Repair**: Opt-in detection and repair of Yahoo's currency-unit errors (sporadic 100x bars and systematic unit switches) on daily and intraday charts
 - **Options Data**: Option chains, expirations, and contract details (calls, puts, strikes, Greeks)
 - **Stock Fundamentals**: Company data including financials, valuation ratios, and key statistics
 - **Holders Data**: Institutional ownership, mutual fund holdings, and insider transactions
@@ -52,6 +53,16 @@ YFinanceClient.resource[IO](config).use { client =>
   }
 }
 ```
+
+## Price Repair
+
+Yahoo occasionally reports bars in the wrong currency subunit (e.g. pence instead of pounds - exactly 100x off). Opt in per call to detect and fix these:
+
+```scala
+client.charts.getChart(Ticker("VOD.L"), Interval.`1Day`, Range.`5Years`, repair = PriceRepairConfig.Enabled)
+```
+
+Repaired bars carry `repaired = true` on their quotes; repair is best-effort and never fails the request. See `PriceRepairConfig` for semantics.
 
 ## Documentation
 

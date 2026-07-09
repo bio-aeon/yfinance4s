@@ -49,6 +49,9 @@ object ChartResult {
     *   Lowest price during the period.
     * @param adjclose
     *   Adjusted closing price (accounts for dividends and splits).
+    * @param repaired
+    *   Whether any O/H/L/C/Adj Close or volume value in this bar was altered by price repair (see
+    *   [[PriceRepairConfig]]). Always false when repair is disabled.
     */
   final case class Quote(
       datetime: ZonedDateTime,
@@ -57,6 +60,7 @@ object ChartResult {
       volume: Long,
       high: Double,
       low: Double,
-      adjclose: Double
+      adjclose: Double,
+      repaired: Boolean = false
   )
 }

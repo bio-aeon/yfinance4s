@@ -33,6 +33,42 @@ clientResource.use { client =>
 }
 ```
 
+## Price Repair
+
+Yahoo occasionally reports bars in the wrong currency subunit (e.g. pence instead of pounds - exactly 100x off), either as sporadic outliers or as a whole block that switched units. Pass `repair` to detect and fix these in-flight:
+
+```scala
+import org.coinductive.yfinance4s.models.PriceRepairConfig
+
+clientResource.use { client =>
+  client.charts.getChart(Ticker("VOD.L"), Interval.`1Day`, Range.`5Years`, repair = PriceRepairConfig.Enabled).map {
+    case Some(chart) =>
+      val touched = chart.quotes.filter(_.repaired)
+      println(s"${chart.quotes.size} bars, ${touched.size} repaired")
+    case None => println("No data found")
+  }
+}
+```
+
+Date-range queries take `repair` through a dedicated overload:
+
+```scala
+clientResource.use { client =>
+  val since = ZonedDateTime.parse("2020-01-01T00:00:00Z")
+  val until = ZonedDateTime.parse("2024-12-31T00:00:00Z")
+
+  client.charts.getChart(
+    Ticker("VOD.L"),
+    Interval.`1Day`,
+    since,
+    until,
+    PriceRepairConfig.Custom(fix100xErrors = true, fixZeroes = false)
+  )
+}
+```
+
+Repair is opt-in (`Disabled` by default), applies to daily and intraday intervals (others are returned unrepaired), and is best-effort - it never fails the request. Repaired bars carry `repaired = true`, and a repaired chart's `dividends` reflect any correction; `getDividends` always reports Yahoo's raw amounts. See `PriceRepairConfig` for the full semantics.
+
 ## Stock Fundamentals
 
 ```scala
