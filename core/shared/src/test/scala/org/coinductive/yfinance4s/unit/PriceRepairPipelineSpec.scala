@@ -21,18 +21,22 @@ class PriceRepairPipelineSpec extends FunSuite {
 
   private def epochAt(i: Int): Long = baseEpoch + i * daySeconds
 
-  private def metaRaw: ChartMetaRaw = ChartMetaRaw(
-    currency = "USD",
+  private def metaRaw(
+      currency: String = "USD",
+      regularMarketPrice: Option[Double] = None,
+      regularMarketTime: Option[Long] = None
+  ): ChartMetaRaw = ChartMetaRaw(
+    currency = currency,
     symbol = "TEST",
     exchangeName = "NMS",
     fullExchangeName = None,
     instrumentType = "EQUITY",
     firstTradeDate = None,
-    regularMarketTime = None,
+    regularMarketTime = regularMarketTime,
     gmtoffset = 0L,
     timezone = "UTC",
     exchangeTimezoneName = "UTC",
-    regularMarketPrice = None,
+    regularMarketPrice = regularMarketPrice,
     chartPreviousClose = None,
     priceHint = None,
     currentTradingPeriod = None,
@@ -42,10 +46,19 @@ class PriceRepairPipelineSpec extends FunSuite {
     hasPrePostMarketData = None
   )
 
+  /** A dividend event map for `chartOf`, keyed by the bar index the dividend falls on. */
+  private def dividendsAt(entries: (Int, Double, Option[String])*): Events =
+    Events(
+      dividends = Some(entries.map { case (i, amount, currency) =>
+        epochAt(i).toString -> DividendEventRaw(amount = amount, date = epochAt(i), currency = currency)
+      }.toMap),
+      splits = None
+    )
+
   /** A daily chart of flat bars (all OHLC and adj close equal to the given price). */
   private def chartOf(
       prices: Vector[Double],
-      meta: Option[ChartMetaRaw] = Some(metaRaw),
+      meta: ChartMetaRaw = metaRaw(),
       events: Option[Events] = None
   ): Chart = {
     val timestamps = prices.indices.map(epochAt).toList
@@ -67,9 +80,13 @@ class PriceRepairPipelineSpec extends FunSuite {
     )
   }
 
-  private def repairedResult(chart: Chart, interval: Interval = Interval.`1Day`): ChartResult =
+  private def repairedResult(
+      chart: Chart,
+      interval: Interval = Interval.`1Day`,
+      fxRates: Map[String, Double] = Map.empty
+  ): ChartResult =
     PriceRepair
-      .prepare(chart, ticker, interval, enabled)
+      .prepare(chart, ticker, interval, enabled, fxRates)
       .map(PriceRepair.complete(_, Reconstruction.empty))
       .getOrElse(fail("expected chart data"))
 
@@ -88,7 +105,7 @@ class PriceRepairPipelineSpec extends FunSuite {
 
   test("matches the plain mapping for a clean chart") {
     val events = Events(
-      dividends = Some(Map(epochAt(2).toString -> DividendEventRaw(amount = 0.5, date = epochAt(2)))),
+      dividends = Some(Map(epochAt(2).toString -> DividendEventRaw(amount = 0.5, date = epochAt(2), currency = None))),
       splits = Some(
         Map(epochAt(4).toString -> SplitEventRaw(date = epochAt(4), numerator = 4, denominator = 1, splitRatio = "4:1"))
       )
@@ -101,7 +118,8 @@ class PriceRepairPipelineSpec extends FunSuite {
     val expected = ChartResult(
       quotes = expectedQuotes,
       dividends = List(DividendEvent(utc(epochAt(2)), 0.5)),
-      splits = List(SplitEvent(utc(epochAt(4)), 4, 1, "4:1"))
+      splits = List(SplitEvent(utc(epochAt(4)), 4, 1, "4:1")),
+      currency = "USD"
     )
     assertEquals(result, expected)
   }
@@ -113,7 +131,8 @@ class PriceRepairPipelineSpec extends FunSuite {
 
   test("rebuilds a switch-scaled dividend into the dividends list") {
     val events = Events(
-      dividends = Some(Map(epochAt(10).toString -> DividendEventRaw(amount = 500.0, date = epochAt(10)))),
+      dividends =
+        Some(Map(epochAt(10).toString -> DividendEventRaw(amount = 500.0, date = epochAt(10), currency = None))),
       splits = None
     )
     val result = repairedResult(chartOf(switchPrices, events = Some(events)))
@@ -148,10 +167,79 @@ class PriceRepairPipelineSpec extends FunSuite {
     assert(result.quotes.forall(!_.repaired), "no bar should be repaired for a weekly chart")
   }
 
-  test("passes a chart without meta through unrepaired") {
-    val result = repairedResult(chartOf(Vector(10.0, 10.0, 10.0, 1000.0, 10.0, 10.0), meta = None))
-    assertEquals(result.quotes(3).close, 1000.0)
-    assert(result.quotes.forall(!_.repaired), "repair must never invent a currency")
+  test("stamps the metadata currency on the result") {
+    val result = repairedResult(chartOf(Vector(10.0, 10.5, 11.0, 10.8)))
+    assertEquals(result.currency, "USD")
+  }
+
+  test("standardises a pence chart end to end") {
+    val chart = chartOf(
+      Vector(2450.0, 2480.0, 2500.0, 2460.0),
+      meta = metaRaw(currency = "GBp"),
+      events = Some(dividendsAt((2, 77.0, None)))
+    )
+    val result = repairedResult(chart)
+
+    assertEquals(result.currency, "GBP")
+    assertEquals(result.quotes.size, 4)
+    assertEquals(result.quotes.map(_.datetime), (0 to 3).toList.map(i => utc(epochAt(i))))
+    assert(math.abs(result.quotes(0).close - 24.50) < 1e-9, s"expected ~24.50, got ${result.quotes(0).close}")
+    assert(math.abs(result.quotes(3).close - 24.60) < 1e-9, s"expected ~24.60, got ${result.quotes(3).close}")
+    val dividend = result.dividends.head
+    assert(math.abs(dividend.amount - 0.77) < 1e-9, s"expected the dividend in pounds, got ${dividend.amount}")
+  }
+
+  test("threads the raw currency into the switch factor after standardisation") {
+    // Fils, with the older block reported 1000x too large: standardisation converts to dinar while the
+    // switch repair still selects its factor from the raw KWF label.
+    val prices = Vector.tabulate(60)(i => if (i < 30) 300000.0 else 300.0)
+    val result = repairedResult(chartOf(prices, meta = metaRaw(currency = "KWF")))
+
+    assertEquals(result.currency, "KWD")
+    result.quotes.foreach { q =>
+      assert(math.abs(q.close - 0.3) < 1e-9, s"expected every close ~0.3 dinar, got ${q.close} at ${q.datetime}")
+    }
+    assertEquals(result.quotes.zipWithIndex.filter(_._1.repaired).map(_._2), (0 until 30).toList)
+  }
+
+  test("applies a fetched rate to a foreign dividend end to end") {
+    val chart = chartOf(
+      Vector(10.0, 10.5, 11.0, 10.8),
+      meta = metaRaw(currency = "GBP"),
+      events = Some(dividendsAt((2, 1.0, Some("USD"))))
+    )
+    val result = repairedResult(chart, fxRates = Map("USD" -> 0.8))
+
+    val dividend = result.dividends.head
+    assert(math.abs(dividend.amount - 0.8) < 1e-9, s"expected the converted amount, got ${dividend.amount}")
+    assertEquals(dividend.currency, Some("GBP"))
+  }
+
+  test("standardises a weekly pence chart without repairing it") {
+    val chart = chartOf(Vector(2450.0, 2480.0, 248000.0, 2460.0), meta = metaRaw(currency = "GBp"))
+    val result = repairedResult(chart, interval = Interval.`1Week`)
+
+    assertEquals(result.currency, "GBP")
+    assert(math.abs(result.quotes(0).close - 24.50) < 1e-9, s"expected ~24.50, got ${result.quotes(0).close}")
+    assert(math.abs(result.quotes(2).close - 2480.0) < 1e-9, s"the outlier must survive, got ${result.quotes(2).close}")
+    assert(result.quotes.forall(!_.repaired), "no bar is repaired on a weekly chart")
+  }
+
+  test("keeps raw amounts and labels on the unrepaired dividend path") {
+    val chart = chartOf(
+      Vector(2450.0, 2480.0, 2500.0, 2460.0),
+      meta = metaRaw(currency = "GBp"),
+      events = Some(dividendsAt((2, 77.0, Some("GBp"))))
+    )
+    val disabled = PriceRepairConfig.resolve(PriceRepairConfig.Disabled)
+    val result = PriceRepair
+      .prepare(chart, ticker, Interval.`1Day`, disabled)
+      .map(PriceRepair.complete(_, Reconstruction.empty))
+      .getOrElse(fail("expected chart data"))
+
+    assertEquals(result.currency, "GBp")
+    assertEquals(result.dividends.head.amount, 77.0)
+    assertEquals(result.dividends.head.currency, Some("GBp"))
   }
 
   test("repairs a switch and a separate lone outlier in one pass") {

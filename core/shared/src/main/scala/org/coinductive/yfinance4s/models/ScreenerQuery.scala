@@ -2,7 +2,7 @@ package org.coinductive.yfinance4s.models
 
 import io.circe.{Encoder, Json}
 
-/** A value used as an operand in a screener query filter — either a string or a number. */
+/** A value used as an operand in a screener query filter - either a string or a number. */
 sealed trait ScreenerValue {
   private[yfinance4s] def toJson: Json
 }

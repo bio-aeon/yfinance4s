@@ -55,12 +55,12 @@
 - `Enabled(maxRequestsPerSecond)` - interval-based pacing; request starts are spaced no closer than `1.second / maxRequestsPerSecond` apart, with no burst capacity
 - `Default` - `Enabled(maxRequestsPerSecond = 2)`
 
-**PriceRepairConfig** - Opt-in currency-unit price repair, passed per `getChart` call (not client-wide):
+**PriceRepairConfig** - Opt-in price repair and currency handling, passed per `getChart` call (not client-wide):
 - `Disabled` - Yahoo's bars verbatim (the default)
 - `Enabled` - every repair the library can currently perform
-- `Custom(fix100xErrors, fixZeroes)` - selective repair; `fix100xErrors` covers both sporadic 100x outliers and systematic unit switches, `fixZeroes` is detection-only until interval reconstruction lands
+- `Custom(fix100xErrors, fixZeroes, standardiseCurrency, convertDividendFx)` - selective repair; `fix100xErrors` covers both sporadic 100x outliers and systematic unit switches, `fixZeroes` is detection-only until interval reconstruction lands, `standardiseCurrency` converts subunit-quoted charts (`GBp`/`ZAc`/`ILA` x0.01, `KWF` x0.001) to their major unit, `convertDividendFx` converts dividends Yahoo labels in another currency at the latest FX rate
 
-Repair applies to daily and intraday intervals only; it is best-effort and never fails the request. Bars altered by repair carry `repaired = true`.
+The error repairs apply to daily and intraday intervals only; currency standardisation and dividend FX apply to every interval. All are best-effort and never fail the request. Bars altered by an error repair carry `repaired = true`; standardisation is a unit conversion and does not set the flag - the currency label is its provenance.
 
 ## Data Models
 
@@ -71,10 +71,12 @@ Repair applies to daily and intraday intervals only; it is best-effort and never
 - `dividends`: List of dividend events within the chart period
 - `splits`: List of stock split events within the chart period
 - `corporateActions`: Combined dividends and splits as `CorporateActions`
+- `currency`: The chart's trading currency, after any standardisation (e.g. `"GBP"` for a pence-quoted chart)
 
 **DividendEvent** - Dividend payment:
 - `exDate`: The ex-dividend date
 - `amount`: Dividend amount per share
+- `currency`: The dividend's own currency where Yahoo reports one (rare); absent means the amount is in the trading currency
 - `yieldAt(sharePrice)`: Calculate dividend yield
 
 **SplitEvent** - Stock split:

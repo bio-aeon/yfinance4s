@@ -9,11 +9,16 @@ import java.time.{Instant, ZoneOffset, ZonedDateTime}
   * @param exDate
   *   The ex-dividend date. Shareholders who own the stock before this date are entitled to receive the dividend.
   * @param amount
-  *   The dividend amount per share in the stock's trading currency.
+  *   The dividend amount per share, in `currency` where that is present and in the stock's trading currency otherwise.
+  * @param currency
+  *   The dividend's currency where Yahoo reports one (rare - seen for issuers paying in a different currency than the
+  *   share price). Absent means the amount is in the instrument's trading currency. On a repaired chart's dividends
+  *   this reflects any standardisation or FX conversion applied (see [[PriceRepairConfig]]).
   */
 final case class DividendEvent(
     exDate: ZonedDateTime,
-    amount: Double
+    amount: Double,
+    currency: Option[String] = None
 ) {
 
   /** Returns the dividend yield relative to a given share price.
@@ -42,7 +47,8 @@ object DividendEvent {
     val epochSeconds = timestampKey.toLong
     DividendEvent(
       exDate = ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneOffset.UTC),
-      amount = raw.amount
+      amount = raw.amount,
+      currency = raw.normalisedCurrency
     )
   }
 

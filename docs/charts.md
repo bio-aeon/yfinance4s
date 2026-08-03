@@ -69,6 +69,44 @@ clientResource.use { client =>
 
 Repair is opt-in (`Disabled` by default), applies to daily and intraday intervals (others are returned unrepaired), and is best-effort - it never fails the request. Repaired bars carry `repaired = true`, and a repaired chart's `dividends` reflect any correction; `getDividends` always reports Yahoo's raw amounts. See `PriceRepairConfig` for the full semantics.
 
+## Currency Standardisation and Dividend FX
+
+Yahoo quotes some international markets in currency subunits rather than major units:
+
+| Yahoo currency | Standardised to | Factor |
+|---|---|---|
+| `GBp` (UK pence) | `GBP` | x0.01 |
+| `ZAc` (South African cents) | `ZAR` | x0.01 |
+| `ILA` (Israeli agora) | `ILS` | x0.01 |
+| `KWF` (Kuwaiti fils) | `KWD` | x0.001 |
+
+The same `repair` parameter standardises them, so a portfolio spanning several markets never mixes pence with pounds. Every chart reports its trading currency through `ChartResult.currency`, with or without repair:
+
+```scala
+clientResource.use { client =>
+  client.charts.getChart(Ticker("VOD.L"), Interval.`1Day`, Range.`1Year`, repair = PriceRepairConfig.Enabled).map {
+    case Some(chart) =>
+      println(chart.currency)             // GBP, standardised from Yahoo's GBp
+      println(chart.quotes.last.close)    // pounds, not pence
+    case None => println("No data found")
+  }
+}
+```
+
+Unlike the error repairs, standardisation applies to every interval, and it does not mark bars `repaired` - it is a unit conversion, not a correction. Provenance is the currency label itself.
+
+Some issuers pay dividends in a different currency than their share price. Yahoo labels those dividends, and `DividendEvent.currency` surfaces the label on every path. With `convertDividendFx` on, such dividends are converted into the price currency at the latest Yahoo FX rate (one small chart fetch per distinct dividend currency - none at all in the common case where no dividend is labelled). Conversion is best-effort: if the rate cannot be fetched, the dividend keeps its original amount and label, so a currency that still differs from `chart.currency` marks an unconverted amount.
+
+```scala
+// Standardise units but leave dividend FX alone.
+PriceRepairConfig.Custom(
+  fix100xErrors = true,
+  fixZeroes = false,
+  standardiseCurrency = true,
+  convertDividendFx = false
+)
+```
+
 ## Stock Fundamentals
 
 ```scala
@@ -100,6 +138,8 @@ clientResource.use { client =>
   }
 }
 ```
+
+A dividend paid in a different currency than the share price carries Yahoo's label in `DividendEvent.currency` (absent means the trading currency). `getDividends` always reports raw amounts and labels; the converted view lives on a repaired chart's `dividends` (see the currency section above).
 
 ## Stock Splits
 

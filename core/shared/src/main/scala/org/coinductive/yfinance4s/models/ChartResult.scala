@@ -15,11 +15,15 @@ import java.time.ZonedDateTime
   *   List of dividend events within the chart period, sorted chronologically.
   * @param splits
   *   List of stock split events within the chart period, sorted chronologically.
+  * @param currency
+  *   The trading currency of the quotes as Yahoo reports it, after any standardisation applied via
+  *   [[PriceRepairConfig]] (e.g. "GBP" for a pence-quoted chart standardised from "GBp").
   */
 final case class ChartResult(
     quotes: List[Quote],
     dividends: List[DividendEvent] = List.empty,
-    splits: List[SplitEvent] = List.empty
+    splits: List[SplitEvent] = List.empty,
+    currency: String
 ) {
 
   /** Returns corporate actions as a combined object.

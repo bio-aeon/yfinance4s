@@ -10,7 +10,7 @@ final case class SectorOverview(
     employeeCount: Option[Long] = None
 ) {
 
-  /** Market weight as a percentage (0–100). */
+  /** Market weight as a percentage (0-100). */
   def marketWeightPercent: Option[Double] = marketWeight.map(_ * 100)
 }
 
@@ -26,7 +26,7 @@ final case class TopCompany(
 ) {
   def toTicker: Ticker = Ticker(symbol)
 
-  /** Market weight as a percentage (0–100). */
+  /** Market weight as a percentage (0-100). */
   def marketWeightPercent: Option[Double] = marketWeight.map(_ * 100)
 }
 
@@ -45,7 +45,7 @@ final case class SectorIndustry(
     marketWeight: Option[Double]
 ) {
 
-  /** Market weight as a percentage (0–100). */
+  /** Market weight as a percentage (0-100). */
   def marketWeightPercent: Option[Double] = marketWeight.map(_ * 100)
 }
 
@@ -82,7 +82,7 @@ final case class SectorData(
   /** Total market weight of the sector, if available. */
   def totalMarketWeight: Option[Double] = overview.flatMap(_.marketWeight)
 
-  /** Total market weight as a percentage (0–100). */
+  /** Total market weight as a percentage (0-100). */
   def totalMarketWeightPercent: Option[Double] = totalMarketWeight.map(_ * 100)
 
   /** Total number of companies in the sector, if available. */

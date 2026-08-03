@@ -70,10 +70,15 @@ private[yfinance4s] object PriceRepair {
     */
   val RepairableIntervals: Set[Interval] = IntervalDurations.keySet
 
-  /** Context the pure algorithms need beyond the bars themselves. */
+  /** Context the pure algorithms need beyond the bars themselves. `currency` is deliberately the raw meta label, never
+    * the standardised one: the unit-switch factor keys on Yahoo's subunit code (KWF means x1000) even after
+    * standardisation relabels the chart to KWD.
+    */
   final case class Context(currency: String, interval: Interval, isFx: Boolean)
 
-  /** Index-addressable working row. Missing prices are `Double.NaN`; missing volume is `0`. */
+  /** Index-addressable working row. Missing prices are `Double.NaN`; missing volume is `0`. `dividendCurrency` is
+    * Yahoo's per-dividend label, rewritten in lockstep with `dividend` by whichever pass touches the amount.
+    */
   final case class Bar(
       datetime: ZonedDateTime,
       open: Double,
@@ -84,7 +89,8 @@ private[yfinance4s] object PriceRepair {
       volume: Long,
       dividend: Double,
       splitRatio: Double,
-      repaired: Boolean
+      repaired: Boolean,
+      dividendCurrency: Option[String] = None
   )
 
   sealed trait PriceColumn
@@ -115,53 +121,67 @@ private[yfinance4s] object PriceRepair {
     val empty: Reconstruction = Reconstruction(Map.empty, Map.empty)
   }
 
-  /** Everything the pure pipeline computed up to the effect boundary: the source data, the mixup-repaired bars, and the
-    * zero/NaN tags awaiting reconstruction (empty when nothing to do).
+  /** Everything the pure pipeline computed up to the effect boundary: the source data, the transformed bars, the
+    * zero/NaN tags awaiting reconstruction (empty when nothing to do), and the effective price currency.
     */
-  final case class Prepared(data: InstrumentData, bars: Vector[Bar], tags: ZeroTags)
+  final case class Prepared(data: InstrumentData, bars: Vector[Bar], tags: ZeroTags, currency: String)
 
-  /** Runs the pure half of the repair pipeline: guards (repairable interval, meta present), bar conversion, the 100x
-    * family (switch then random), and zero/NaN detection. Returns `None` iff the chart carries no result data. A
-    * guarded-off chart yields untouched bars and empty tags, so `complete` reproduces the unrepaired mapping.
+  /** Runs the pure half of the repair pipeline: currency standardisation and dividend FX application (every interval),
+    * then the 100x family and zero/NaN detection (daily and intraday only). `fxRates` are the rates resolved for this
+    * chart's mismatched dividend currencies, empty when conversion is off or nothing mismatched. Returns `None` iff the
+    * chart carries no result data. A guarded-off chart yields untouched bars and empty tags, so `complete` reproduces
+    * the unrepaired mapping.
     */
-  def prepare(chart: Chart, ticker: Ticker, interval: Interval, cfg: PriceRepairConfig.Custom): Option[Prepared] =
+  def prepare(
+      chart: Chart,
+      ticker: Ticker,
+      interval: Interval,
+      cfg: PriceRepairConfig.Custom,
+      fxRates: Map[String, Double] = Map.empty
+  ): Option[Prepared] =
     chart.result.headOption.map { data =>
+      val meta = data.meta
       val bars = toBars(data)
-      data.meta match {
-        case Some(meta) if RepairableIntervals.contains(interval) =>
-          val ctx = Context(meta.currency, interval, isFx = ticker.value.endsWith(FxTickerSuffix))
-          val repaired = if (cfg.fix100xErrors) repairUnitMixups(bars, ctx) else bars
-          val tags = if (cfg.fixZeroes) detectZeroes(repaired, ctx) else ZeroTags.empty
-          Prepared(data, repaired, tags)
-        case _ =>
-          Prepared(data, bars, ZeroTags.empty)
-      }
+      val (standardised, label) =
+        if (cfg.standardiseCurrency) CurrencyStandardisation.standardise(bars, meta)
+        else (bars, meta.currency)
+      val converted =
+        if (cfg.convertDividendFx) DividendFxConversion.applyRates(standardised, label, fxRates)
+        else standardised
+      if (RepairableIntervals.contains(interval)) {
+        val ctx = Context(meta.currency, interval, isFx = ticker.value.endsWith(FxTickerSuffix))
+        val repaired = if (cfg.fix100xErrors) repairUnitMixups(converted, ctx) else converted
+        val tags = if (cfg.fixZeroes) detectZeroes(repaired, ctx) else ZeroTags.empty
+        Prepared(data, repaired, tags, label)
+      } else Prepared(data, converted, ZeroTags.empty, label)
     }
 
   /** Applies the reconstruction (restoring originals for uncovered tags) and assembles the final [[ChartResult]]. The
-    * dividends list is rebuilt from the repaired bars so a switch-scaled dividend surfaces scaled; splits are
-    * re-attached from the raw events unchanged.
+    * dividends list is rebuilt from the repaired bars so a switch-scaled or converted dividend surfaces as such; splits
+    * are re-attached from the raw events unchanged.
     */
   def complete(prepared: Prepared, recon: Reconstruction): ChartResult = {
     val bars = applyReconstruction(prepared.bars, prepared.tags, recon)
     val quotes = bars.map { b =>
       ChartResult.Quote(b.datetime, b.close, b.open, b.volume, b.high, b.low, b.adjClose, b.repaired)
     }.toList
-    ChartResult(quotes, rebuiltDividends(prepared.data, bars), rawSplits(prepared.data))
+    ChartResult(quotes, rebuiltDividends(prepared.data, bars), rawSplits(prepared.data), prepared.currency)
   }
 
-  /** Dividend events with amounts taken from the (possibly repaired) bar at their timestamp; an event with no matching
-    * bar keeps its raw amount.
+  /** Dividend events with amount and currency taken from the (possibly transformed) bar at their timestamp; an event
+    * with no matching bar keeps its raw amount and label.
     */
   private def rebuiltDividends(data: InstrumentData, bars: Vector[Bar]): List[DividendEvent] = {
-    val dividendByEpoch: Map[Long, Double] =
-      data.timestamp.zip(bars).map { case (ts, b) => ts -> b.dividend }.toMap
+    val dividendByEpoch: Map[Long, (Double, Option[String])] =
+      data.timestamp.zip(bars).map { case (ts, b) => ts -> (b.dividend, b.dividendCurrency) }.toMap
     data.events
       .flatMap(_.dividends)
       .getOrElse(Map.empty)
       .map { case (key, raw) =>
         val event = DividendEvent.fromRaw(key, raw)
-        dividendByEpoch.get(key.toLong).fold(event)(amount => event.copy(amount = amount))
+        dividendByEpoch.get(key.toLong).fold(event) { case (amount, currency) =>
+          event.copy(amount = amount, currency = currency)
+        }
       }
       .toList
       .sorted
@@ -188,6 +208,10 @@ private[yfinance4s] object PriceRepair {
 
     val dividendAmounts: Map[Long, Double] =
       data.events.flatMap(_.dividends).getOrElse(Map.empty).map { case (key, raw) => key.toLong -> raw.amount }
+    val dividendCurrencies: Map[Long, Option[String]] =
+      data.events.flatMap(_.dividends).getOrElse(Map.empty).map { case (key, raw) =>
+        key.toLong -> raw.normalisedCurrency
+      }
     val splitFactors: Map[Long, Double] =
       data.events.flatMap(_.splits).getOrElse(Map.empty).map { case (key, raw) =>
         key.toLong -> raw.numerator.toDouble / raw.denominator.toDouble
@@ -204,7 +228,8 @@ private[yfinance4s] object PriceRepair {
         volume = volumes(i),
         dividend = dividendAmounts.getOrElse(ts, 0.0),
         splitRatio = splitFactors.getOrElse(ts, 0.0),
-        repaired = false
+        repaired = false,
+        dividendCurrency = dividendCurrencies.getOrElse(ts, None)
       )
     }.toVector
   }

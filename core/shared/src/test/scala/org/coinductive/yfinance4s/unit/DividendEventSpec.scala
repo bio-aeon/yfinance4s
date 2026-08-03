@@ -9,7 +9,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 class DividendEventSpec extends FunSuite {
 
   test("parses epoch timestamp into date") {
-    val raw = DividendEventRaw(amount = 0.24, date = 1704067200L)
+    val raw = DividendEventRaw(amount = 0.24, date = 1704067200L, currency = None)
     val event = DividendEvent.fromRaw("1704067200", raw)
 
     assertEquals(event.amount, 0.24)
@@ -17,6 +17,15 @@ class DividendEventSpec extends FunSuite {
     assertEquals(event.exDate.getMonthValue, 1)
     assertEquals(event.exDate.getDayOfMonth, 1)
     assertEquals(event.exDate.getZone, ZoneOffset.UTC)
+  }
+
+  test("drops an empty currency label from the raw event") {
+    def currencyOf(raw: String): Option[String] =
+      DividendEvent.fromRaw("1704067200", DividendEventRaw(amount = 0.24, date = 1704067200L, Some(raw))).currency
+
+    assertEquals(currencyOf(""), None)
+    assertEquals(currencyOf("  "), None)
+    assertEquals(currencyOf("USD"), Some("USD"))
   }
 
   test("calculates dividend yield at given share price") {

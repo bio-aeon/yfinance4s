@@ -88,12 +88,13 @@ private[yfinance4s] object Charts {
   private val MetadataRange: Range = Range.`1Month`
 
   def apply[F[_]: MonadThrow](gateway: YFinanceGateway[F], scrapper: YFinanceScrapper[F]): Charts[F] =
-    new ChartsImpl(gateway, scrapper, IntervalReconstructor.noOp[F])
+    new ChartsImpl(gateway, scrapper, IntervalReconstructor.noOp[F], FxRateSource.yahoo(gateway))
 
   private final class ChartsImpl[F[_]: MonadThrow](
       gateway: YFinanceGateway[F],
       scrapper: YFinanceScrapper[F],
-      reconstructor: IntervalReconstructor[F]
+      reconstructor: IntervalReconstructor[F],
+      fxRateSource: FxRateSource[F]
   ) extends Charts[F] {
 
     def getChart(
@@ -162,7 +163,7 @@ private[yfinance4s] object Charts {
     // --- Private Mapping Helpers ---
 
     private def extractMetadata(ticker: Ticker, chart: Chart): F[HistoryMetadata] =
-      chart.result.headOption.flatMap(_.meta) match {
+      chart.result.headOption.map(_.meta) match {
         case Some(raw) =>
           HistoryMetadata
             .fromRaw(raw)
@@ -183,19 +184,30 @@ private[yfinance4s] object Charts {
         chart: Chart
     ): F[Option[ChartResult]] =
       PriceRepairConfig.resolve(repair) match {
-        case PriceRepairConfig.Custom(false, false) =>
+        case PriceRepairConfig.Custom(false, false, false, false) =>
           MonadThrow[F].pure(mapChart(chart)) // fast path: byte-identical to the unrepaired mapping
         case cfg =>
-          PriceRepair.prepare(chart, ticker, interval, cfg) match {
-            case None =>
-              MonadThrow[F].pure(None)
-            case Some(prepared) if prepared.tags.isEmpty =>
-              MonadThrow[F].pure(Some(PriceRepair.complete(prepared, PriceRepair.Reconstruction.empty)))
-            case Some(prepared) =>
-              reconstructor
-                .reconstruct(ticker, interval, prepared.bars, prepared.tags)
-                .map(recon => Some(PriceRepair.complete(prepared, recon)))
+          fxRatesFor(chart, cfg).flatMap { rates =>
+            PriceRepair.prepare(chart, ticker, interval, cfg, rates) match {
+              case None =>
+                MonadThrow[F].pure(None)
+              case Some(prepared) if prepared.tags.isEmpty =>
+                MonadThrow[F].pure(Some(PriceRepair.complete(prepared, PriceRepair.Reconstruction.empty)))
+              case Some(prepared) =>
+                reconstructor
+                  .reconstruct(ticker, interval, prepared.bars, prepared.tags)
+                  .map(recon => Some(PriceRepair.complete(prepared, recon)))
+            }
           }
+      }
+
+    /** Resolved FX rates for the chart's mismatched dividend currencies; empty (and fetch-free) when conversion is off
+      * or nothing mismatches.
+      */
+    private def fxRatesFor(chart: Chart, cfg: PriceRepairConfig.Custom): F[Map[String, Double]] =
+      chart.result.headOption.map(DividendFxConversion.requiredPlans(_, cfg)) match {
+        case Some(plans) if plans.nonEmpty => DividendFxConversion.resolveRates(plans, fxRateSource)
+        case _                             => MonadThrow[F].pure(Map.empty)
       }
 
     private def mapChart(chart: Chart): Option[ChartResult] =
@@ -217,7 +229,7 @@ private[yfinance4s] object Charts {
         val dividends = extractDividendsFromData(data)
         val splits = extractSplitsFromData(data)
 
-        ChartResult(quotes, dividends, splits)
+        ChartResult(quotes, dividends, splits, data.meta.currency)
       }
 
     private def extractDividends(chart: Chart): Option[List[DividendEvent]] =

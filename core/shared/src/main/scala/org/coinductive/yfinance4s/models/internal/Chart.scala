@@ -14,8 +14,10 @@ private[yfinance4s] object Chart {
   }
 }
 
+// Yahoo ships `meta` on every instrument payload; an error envelope carries no payload at all (result: null),
+// so a missing `meta` is a malformed response and fails decoding like a missing `indicators` would.
 private[yfinance4s] final case class InstrumentData(
-    meta: Option[ChartMetaRaw],
+    meta: ChartMetaRaw,
     timestamp: List[Long],
     indicators: Indicators,
     events: Option[Events]
@@ -108,8 +110,13 @@ private[yfinance4s] object Events {
 
 private[yfinance4s] final case class DividendEventRaw(
     amount: Double,
-    date: Long
-)
+    date: Long,
+    currency: Option[String]
+) {
+
+  /** The label with Yahoo's empty/blank sentinel normalised away - the only form the library reads. */
+  def normalisedCurrency: Option[String] = currency.map(_.trim).filter(_.nonEmpty)
+}
 
 private[yfinance4s] object DividendEventRaw {
   implicit val decoder: Decoder[DividendEventRaw] = deriveDecoder
