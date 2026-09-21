@@ -5,7 +5,7 @@ The `financials` module provides income statements, balance sheets, and cash flo
 ## All Statements
 
 ```scala
-import org.coinductive.yfinance4s.models.Frequency
+import io.github.coinductive.yfinance4s.models.Frequency
 
 clientResource.use { client =>
   client.financials.getFinancialStatements(Ticker("AAPL")).map {

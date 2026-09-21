@@ -30,8 +30,8 @@ Effectful Yahoo Finance client in the Scala programming language.
 
 ```scala
 import cats.effect._
-import org.coinductive.yfinance4s._
-import org.coinductive.yfinance4s.models._
+import io.github.coinductive.yfinance4s._
+import io.github.coinductive.yfinance4s.models._
 import scala.concurrent.duration._
 
 val config = YFinanceClientConfig(

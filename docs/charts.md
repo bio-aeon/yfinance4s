@@ -5,7 +5,7 @@ The `charts` module provides historical price data, current stock quotes, and co
 ## Historical Chart Data
 
 ```scala
-import org.coinductive.yfinance4s.models.{Interval, Range, Ticker}
+import io.github.coinductive.yfinance4s.models.{Interval, Range, Ticker}
 
 clientResource.use { client =>
   client.charts.getChart(Ticker("AAPL"), Interval.`1Day`, Range.`1Year`).flatMap {
@@ -38,7 +38,7 @@ clientResource.use { client =>
 Yahoo occasionally reports bars in the wrong currency subunit (e.g. pence instead of pounds - exactly 100x off), either as sporadic outliers or as a whole block that switched units. Pass `repair` to detect and fix these in-flight:
 
 ```scala
-import org.coinductive.yfinance4s.models.PriceRepairConfig
+import io.github.coinductive.yfinance4s.models.PriceRepairConfig
 
 clientResource.use { client =>
   client.charts.getChart(Ticker("VOD.L"), Interval.`1Day`, Range.`5Years`, repair = PriceRepairConfig.Enabled).map {

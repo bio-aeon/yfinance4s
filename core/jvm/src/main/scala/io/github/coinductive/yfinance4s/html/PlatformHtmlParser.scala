@@ -1,0 +1,5 @@
+package io.github.coinductive.yfinance4s.html
+
+object PlatformHtmlParser extends HtmlParser {
+  def parse(html: String): HtmlParser.Document = JsoupHtmlParser.parse(html)
+}

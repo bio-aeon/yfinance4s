@@ -7,7 +7,7 @@ The `markets` module exposes Yahoo Finance's region-level market data: headline 
 `MarketRegion` is a simple newtype around a Yahoo region code (uppercase ISO-3166 alpha-2). There are no curated constants - any code Yahoo accepts works identically. Common values: `US`, `GB`, `CA`, `DE`, `FR`, `IT`, `ES`, `AU`, `JP`, `HK`, `IN`, `BR`, `MX`.
 
 ```scala
-import org.coinductive.yfinance4s.models.*
+import io.github.coinductive.yfinance4s.models.*
 
 val US = MarketRegion("US")
 val JP = MarketRegion("JP")

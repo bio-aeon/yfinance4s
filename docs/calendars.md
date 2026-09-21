@@ -8,7 +8,7 @@ Returns `EarningsEvent`s within a date range, ordered by scheduled date ascendin
 
 ```scala
 import java.time.{LocalDate, ZoneOffset}
-import org.coinductive.yfinance4s.models.*
+import io.github.coinductive.yfinance4s.models.*
 
 clientResource.use { client =>
   val today = LocalDate.now(ZoneOffset.UTC)

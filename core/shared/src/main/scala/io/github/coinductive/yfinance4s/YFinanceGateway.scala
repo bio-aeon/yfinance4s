@@ -1,0 +1,461 @@
+package io.github.coinductive.yfinance4s
+
+import cats.effect.{Async, Resource, Sync}
+import cats.syntax.show.*
+import io.circe.{Decoder, Json}
+import io.circe.parser.decode
+import io.github.coinductive.yfinance4s.models.*
+import io.github.coinductive.yfinance4s.models.internal.*
+import retry.{RetryPolicies, RetryPolicy, Sleep}
+import sttp.client3.{SttpBackend, UriContext, basicRequest}
+
+import java.time.{ZoneOffset, ZonedDateTime}
+import scala.concurrent.duration.FiniteDuration
+
+sealed trait YFinanceGateway[F[_]] {
+  def getChart(ticker: Ticker, interval: Interval, range: Range): F[Chart]
+
+  def getChart(
+      ticker: Ticker,
+      interval: Interval,
+      since: ZonedDateTime,
+      until: ZonedDateTime
+  ): F[Chart]
+
+  def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[OptionChainResponse]
+
+  def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[OptionChainResponse]
+
+  def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[HoldersQuoteSummary]
+
+  def getFinancials(ticker: Ticker, frequency: Frequency, statementType: String = "all"): F[YFinanceFinancialsResult]
+
+  def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[AnalystQuoteSummary]
+
+  def search(query: String, quotesCount: Int, newsCount: Int, enableFuzzyQuery: Boolean): F[YFinanceSearchResult]
+
+  def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult]
+
+  def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult]
+
+  def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult]
+
+  def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult]
+
+  def getMarketSummary(region: MarketRegion, credentials: YFinanceCredentials): F[YFinanceMarketSummaryResult]
+
+  def getMarketStatus(region: MarketRegion, credentials: YFinanceCredentials): F[YFinanceMarketStatusResult]
+
+  def getMarketTrending(
+      region: MarketRegion,
+      count: Int,
+      credentials: YFinanceCredentials
+  ): F[YFinanceTrendingResult]
+
+  /** Posts a visualization query. The optional `ticker` selects the failure-mapping policy: when `Some(t)`, an envelope
+    * failure with `error.code == "Not Found"` becomes `TickerNotFound(t)`; when `None` (market-wide queries), any
+    * non-rate-limit failure becomes `DataParseError`. Yahoo's actual `POST /v1/finance/visualization` endpoint is the
+    * same regardless.
+    */
+  def postVisualization(
+      body: String,
+      credentials: YFinanceCredentials,
+      ticker: Option[Ticker]
+  ): F[Calendar]
+}
+
+private object YFinanceGateway {
+
+  def resource[F[_]: Async](
+      connectTimeout: FiniteDuration,
+      readTimeout: FiniteDuration,
+      retries: Int,
+      rateLimiter: RateLimiter[F]
+  ): Resource[F, YFinanceGateway[F]] =
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _, rateLimiter))
+
+  def apply[F[_]: Sync: Sleep](
+      retries: Int,
+      sttpBackend: SttpBackend[F, Any],
+      rateLimiter: RateLimiter[F]
+  ): YFinanceGateway[F] = {
+    val retryPolicy = RetryPolicies.limitRetries(retries)
+    new YFinanceGatewayImpl[F](sttpBackend, retryPolicy, rateLimiter)
+  }
+
+  private final class YFinanceGatewayImpl[F[_]](
+      protected val sttpBackend: SttpBackend[F, Any],
+      protected val retryPolicy: RetryPolicy[F],
+      protected val rateLimiter: RateLimiter[F]
+  )(implicit
+      protected val F: Sync[F],
+      protected val S: Sleep[F]
+  ) extends HTTPBase[F]
+      with YFinanceGateway[F] {
+
+    private val ChartApiEndpoint = uri"https://query1.finance.yahoo.com/v8/finance/chart/"
+    private val OptionsApiEndpoint = uri"https://query1.finance.yahoo.com/v7/finance/options/"
+    private val QuoteSummaryEndpoint = uri"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+
+    private val HoldersModules =
+      "majorHoldersBreakdown,institutionOwnership,fundOwnership,insiderTransactions,insiderHolders"
+
+    private val AnalystModules =
+      "financialData,recommendationTrend,upgradeDowngradeHistory,earningsTrend,earningsHistory,indexTrend"
+
+    private val FinancialsEndpoint =
+      uri"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
+
+    private val SearchEndpoint = uri"https://query2.finance.yahoo.com/v1/finance/search"
+    private val ScreenerEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/screener"
+    private val PredefinedScreenerEndpoint =
+      uri"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+    private val DefaultQuotesQueryId = "tss_match_phrase_query"
+    private val DefaultNewsQueryId = "news_cie_vespa"
+
+    private val SectorsEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/sectors/"
+    private val IndustriesEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/industries/"
+
+    private val MarketSummaryEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/quote/marketSummary"
+    private val MarketTimeEndpoint = uri"https://query1.finance.yahoo.com/v6/finance/markettime"
+    private val TrendingEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/trending/"
+
+    private val VisualizationEndpoint = uri"https://query1.finance.yahoo.com/v1/finance/visualization"
+
+    private val ChartPath = "chart"
+    private val OptionChainPath = "optionChain"
+    private val QuoteSummaryPath = "quoteSummary"
+    private val FinancePath = "finance"
+
+    private val VisualizationQueryParams = Map(
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
+
+    private val MarketSummaryFields = List(
+      "shortName",
+      "fullExchangeName",
+      "exchange",
+      "currency",
+      "marketState",
+      "exchangeTimezoneName",
+      "regularMarketPrice",
+      "regularMarketChange",
+      "regularMarketChangePercent",
+      "regularMarketTime",
+      "previousClose"
+    ).mkString(",")
+
+    private val MarketBaseParams = Map(
+      "formatted" -> "true",
+      "lang" -> "en-US"
+    )
+
+    private val DomainQueryParams = Map(
+      "formatted" -> "true",
+      "withReturns" -> "true",
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
+
+    private val ScreenerQueryParams = Map(
+      "corsDomain" -> "finance.yahoo.com",
+      "formatted" -> "false",
+      "lang" -> "en-US",
+      "region" -> "US"
+    )
+
+    def getChart(ticker: Ticker, interval: Interval, range: Range): F[Chart] = {
+      val req =
+        basicRequest.get(
+          ChartApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("interval", interval.show), ("range", range.show), ("events", "div,split"))
+        )
+
+      sendRequest(req, parseTickerEnvelope[Chart](ChartPath, "chart", ticker))
+    }
+
+    def getChart(
+        ticker: Ticker,
+        interval: Interval,
+        since: ZonedDateTime,
+        until: ZonedDateTime
+    ): F[Chart] = {
+      val req =
+        basicRequest.get(
+          ChartApiEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("interval", interval.show),
+              ("period1", since.toEpochSecond.show),
+              ("period2", until.toEpochSecond.show),
+              ("events", "div,split")
+            )
+        )
+
+      sendRequest(req, parseTickerEnvelope[Chart](ChartPath, "chart", ticker))
+    }
+
+    def getOptions(ticker: Ticker, credentials: YFinanceCredentials): F[OptionChainResponse] = {
+      val req = basicRequest
+        .get(
+          OptionsApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("crumb", credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseTickerEnvelope[OptionChainResponse](OptionChainPath, "options", ticker))
+    }
+
+    def getOptions(ticker: Ticker, expiration: Long, credentials: YFinanceCredentials): F[OptionChainResponse] = {
+      val req = basicRequest
+        .get(
+          OptionsApiEndpoint
+            .addPath(ticker.show)
+            .withParams(("date", expiration.toString), ("crumb", credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseTickerEnvelope[OptionChainResponse](OptionChainPath, "options", ticker))
+    }
+
+    def getHolders(ticker: Ticker, credentials: YFinanceCredentials): F[HoldersQuoteSummary] = {
+      val req = basicRequest
+        .get(
+          QuoteSummaryEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("modules", HoldersModules),
+              ("corsDomain", "finance.yahoo.com"),
+              ("crumb", credentials.crumb)
+            )
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseTickerEnvelope[HoldersQuoteSummary](QuoteSummaryPath, "holders", ticker))
+    }
+
+    def getFinancials(
+        ticker: Ticker,
+        frequency: Frequency,
+        statementType: String
+    ): F[YFinanceFinancialsResult] = {
+      val keys = statementType match {
+        case "income"        => IncomeStatement.apiKeys
+        case "balance-sheet" => BalanceSheet.apiKeys
+        case "cash-flow"     => CashFlowStatement.apiKeys
+        case _               => IncomeStatement.apiKeys ++ BalanceSheet.apiKeys ++ CashFlowStatement.apiKeys
+      }
+
+      val typeParam = keys.map(k => s"${frequency.apiValue}$k").mkString(",")
+      val now = ZonedDateTime.now(ZoneOffset.UTC)
+      val startDate = now.minusYears(10)
+
+      val req = basicRequest.get(
+        FinancialsEndpoint
+          .addPath(ticker.show)
+          .withParams(
+            ("symbol", ticker.show),
+            ("type", typeParam),
+            ("period1", startDate.toEpochSecond.toString),
+            ("period2", now.toEpochSecond.toString)
+          )
+      )
+
+      sendRequest(req, parseAs[YFinanceFinancialsResult]("financials"))
+    }
+
+    def getAnalystData(ticker: Ticker, credentials: YFinanceCredentials): F[AnalystQuoteSummary] = {
+      val req = basicRequest
+        .get(
+          QuoteSummaryEndpoint
+            .addPath(ticker.show)
+            .withParams(
+              ("modules", AnalystModules),
+              ("corsDomain", "finance.yahoo.com"),
+              ("crumb", credentials.crumb)
+            )
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseTickerEnvelope[AnalystQuoteSummary](QuoteSummaryPath, "analyst", ticker))
+    }
+
+    def search(
+        query: String,
+        quotesCount: Int,
+        newsCount: Int,
+        enableFuzzyQuery: Boolean
+    ): F[YFinanceSearchResult] = {
+      val req = basicRequest.get(
+        SearchEndpoint.withParams(
+          ("q", query),
+          ("quotesCount", quotesCount.toString),
+          ("newsCount", newsCount.toString),
+          ("enableFuzzyQuery", enableFuzzyQuery.toString),
+          ("quotesQueryId", DefaultQuotesQueryId),
+          ("newsQueryId", DefaultNewsQueryId),
+          ("listsCount", quotesCount.toString),
+          ("enableCb", "true"),
+          ("enableNavLinks", "false"),
+          ("enableResearchReports", "false"),
+          ("enableCulturalAssets", "false"),
+          ("recommendedCount", quotesCount.toString)
+        )
+      )
+
+      sendRequest(req, parseAs[YFinanceSearchResult]("search"))
+    }
+
+    def screenCustom(body: String, credentials: YFinanceCredentials): F[YFinanceScreenerResult] = {
+      val params = ScreenerQueryParams ++ Map("crumb" -> credentials.crumb)
+      val req = basicRequest
+        .post(ScreenerEndpoint.withParams(params))
+        .body(body)
+        .contentType("application/json")
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceScreenerResult]("screener"))
+    }
+
+    def screenPredefined(screenId: String, count: Int): F[YFinanceScreenerResult] = {
+      val params = ScreenerQueryParams ++ Map(
+        "scrIds" -> screenId,
+        "count" -> count.toString
+      )
+      val req = basicRequest.get(PredefinedScreenerEndpoint.withParams(params))
+
+      sendRequest(req, parseAs[YFinanceScreenerResult]("screener"))
+    }
+
+    def getSectorData(sectorKey: SectorKey, credentials: YFinanceCredentials): F[YFinanceSectorResult] = {
+      val req = basicRequest
+        .get(
+          SectorsEndpoint
+            .addPath(sectorKey.show)
+            .withParams(DomainQueryParams ++ Map("crumb" -> credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+      sendRequest(req, parseAs[YFinanceSectorResult]("sector"))
+    }
+
+    def getIndustryData(industryKey: IndustryKey, credentials: YFinanceCredentials): F[YFinanceIndustryResult] = {
+      val req = basicRequest
+        .get(
+          IndustriesEndpoint
+            .addPath(industryKey.show)
+            .withParams(DomainQueryParams ++ Map("crumb" -> credentials.crumb))
+        )
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+      sendRequest(req, parseAs[YFinanceIndustryResult]("industry"))
+    }
+
+    def getMarketSummary(
+        region: MarketRegion,
+        credentials: YFinanceCredentials
+    ): F[YFinanceMarketSummaryResult] = {
+      val params = MarketBaseParams ++ Map(
+        "fields" -> MarketSummaryFields,
+        "market" -> region.show,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(MarketSummaryEndpoint.withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceMarketSummaryResult]("market summary"))
+    }
+
+    def getMarketStatus(
+        region: MarketRegion,
+        credentials: YFinanceCredentials
+    ): F[YFinanceMarketStatusResult] = {
+      val params = MarketBaseParams ++ Map(
+        "key" -> "finance",
+        "market" -> region.show,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(MarketTimeEndpoint.withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceMarketStatusResult]("market status"))
+    }
+
+    def getMarketTrending(
+        region: MarketRegion,
+        count: Int,
+        credentials: YFinanceCredentials
+    ): F[YFinanceTrendingResult] = {
+      val params = MarketBaseParams ++ Map(
+        "count" -> count.toString,
+        "crumb" -> credentials.crumb
+      )
+      val req = basicRequest
+        .get(TrendingEndpoint.addPath(region.show).withParams(params))
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      sendRequest(req, parseAs[YFinanceTrendingResult]("trending"))
+    }
+
+    def postVisualization(
+        body: String,
+        credentials: YFinanceCredentials,
+        ticker: Option[Ticker]
+    ): F[Calendar] = {
+      val params = VisualizationQueryParams ++ Map("crumb" -> credentials.crumb)
+      val req = basicRequest
+        .post(VisualizationEndpoint.withParams(params))
+        .body(body)
+        .contentType("application/json")
+        .headers(YFinanceAuth.apiHeaders *)
+        .header("Cookie", credentials.cookies.mkString("; "))
+
+      val parser: String => F[Calendar] = ticker match {
+        case Some(t) => parseTickerEnvelope[Calendar](FinancePath, "calendar", t)
+        case None    => parseGenericEnvelope[Calendar](FinancePath, "calendar")
+      }
+      sendRequest(req, parser)
+    }
+
+    // --- Envelope helpers --------------------------------------------------
+
+    private def parseTickerEnvelope[A: Decoder](path: String, label: String, ticker: Ticker)(content: String): F[A] =
+      parseEnvelope[A](path, label, err => YahooErrorMapping.raiseFor[F, A](ticker, err))(content)
+
+    private def parseGenericEnvelope[A: Decoder](path: String, label: String)(content: String): F[A] =
+      parseEnvelope[A](path, label, err => YahooErrorMapping.raiseGeneric[F, A](label, err))(content)
+
+    private def parseEnvelope[A: Decoder](
+        path: String,
+        label: String,
+        onFailure: YahooErrorBody => F[A]
+    )(content: String): F[A] =
+      decode[Json](content).fold(
+        e => F.raiseError(YFinanceError.DataParseError(s"Failed to parse $label response: ${e.getMessage}", Some(e))),
+        json =>
+          json.hcursor.downField(path).as[YahooResponse[A]] match {
+            case Right(YahooResponse.Success(a))   => F.pure(a)
+            case Right(YahooResponse.Failure(err)) => onFailure(err)
+            case Left(err) =>
+              F.raiseError(
+                YFinanceError.DataParseError(s"Failed to decode $label response: ${err.getMessage}", Some(err))
+              )
+          }
+      )
+
+  }
+
+}

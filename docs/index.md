@@ -36,8 +36,8 @@ npm install node-html-parser
 
 ```scala
 import cats.effect._
-import org.coinductive.yfinance4s._
-import org.coinductive.yfinance4s.models._
+import io.github.coinductive.yfinance4s._
+import io.github.coinductive.yfinance4s.models._
 import scala.concurrent.duration._
 
 val config = YFinanceClientConfig(
@@ -73,7 +73,7 @@ configured rate is the *combined* outbound rate (not a per-component multiplier)
 Configure via `YFinanceClientConfig.rateLimit`:
 
 ```scala
-import org.coinductive.yfinance4s.models.RateLimitConfig
+import io.github.coinductive.yfinance4s.models.RateLimitConfig
 
 // Custom rate for an aggressive backfill
 val backfillConfig = config.copy(

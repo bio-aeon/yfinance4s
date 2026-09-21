@@ -1,0 +1,86 @@
+package io.github.coinductive.yfinance4s
+
+import cats.effect.{Async, Resource, Sync}
+import cats.syntax.apply.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
+import cats.syntax.show.*
+import io.github.coinductive.yfinance4s.html.PlatformHtmlParser
+import io.github.coinductive.yfinance4s.models.Ticker
+import io.github.coinductive.yfinance4s.models.internal.YFinanceQuoteResult
+import retry.{RetryPolicies, RetryPolicy, Sleep}
+import sttp.client3.{SttpBackend, UriContext, basicRequest}
+
+import scala.concurrent.duration.FiniteDuration
+
+sealed trait YFinanceScrapper[F[_]] {
+  def getQuote(ticker: Ticker): F[Option[YFinanceQuoteResult]]
+}
+
+private object YFinanceScrapper {
+
+  def resource[F[_]: Async](
+      connectTimeout: FiniteDuration,
+      readTimeout: FiniteDuration,
+      retries: Int,
+      rateLimiter: RateLimiter[F]
+  ): Resource[F, YFinanceScrapper[F]] =
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).map(apply[F](retries, _, rateLimiter))
+
+  def apply[F[_]: Sync: Sleep](
+      retries: Int,
+      sttpBackend: SttpBackend[F, Any],
+      rateLimiter: RateLimiter[F]
+  ): YFinanceScrapper[F] = {
+    val retryPolicy = RetryPolicies.limitRetries(retries)
+    new YFinanceScrapperImpl[F](sttpBackend, retryPolicy, rateLimiter)
+  }
+
+  private final class YFinanceScrapperImpl[F[_]](
+      protected val sttpBackend: SttpBackend[F, Any],
+      protected val retryPolicy: RetryPolicy[F],
+      protected val rateLimiter: RateLimiter[F]
+  )(implicit
+      protected val F: Sync[F],
+      protected val S: Sleep[F]
+  ) extends HTTPBase[F]
+      with YFinanceScrapper[F] {
+
+    private val QuoteEndpoint = uri"https://finance.yahoo.com/quote/"
+    private val QuoteSummaryUrl = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+    private val FundamentalsTimeSeriesUrl =
+      "https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
+
+    def getQuote(ticker: Ticker): F[Option[YFinanceQuoteResult]] = {
+      val req = basicRequest.get(QuoteEndpoint.addPath(ticker.show))
+      sendRequest(req, parseContent)
+    }
+
+    private def parseContent(content: String): F[Option[YFinanceQuoteResult]] = {
+      val doc = PlatformHtmlParser.parse(content)
+      val elements = doc.select("script[data-sveltekit-fetched][data-url]")
+      val (maybeSummary, maybeFundamentals) =
+        elements.foldLeft[(Option[String], Option[String])]((None, None)) {
+          case ((summaryStr, fundamentalsStr), element) =>
+            val dataUrl = element.attr("data-url")
+            val jsonData = element.html
+            if (dataUrl.contains(QuoteSummaryUrl)) {
+              (Either.cond(jsonData.nonEmpty, Some(jsonData), None).merge, fundamentalsStr)
+            } else if (dataUrl.contains(FundamentalsTimeSeriesUrl)) {
+              (summaryStr, Either.cond(jsonData.nonEmpty, Some(jsonData), None).merge)
+            } else {
+              (summaryStr, fundamentalsStr)
+            }
+        }
+
+      (maybeSummary, maybeFundamentals).traverseN { case (summaryStr, fundamentalsStr) =>
+        for {
+          summary <- parseAs[YFinanceQuoteResult.Summary]("quote summary")(summaryStr)
+          fundamentals <- parseAs[YFinanceQuoteResult.Fundamentals]("quote fundamentals")(fundamentalsStr)
+        } yield YFinanceQuoteResult(summary, fundamentals)
+      }
+    }
+
+  }
+
+}

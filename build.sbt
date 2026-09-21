@@ -1,6 +1,6 @@
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
-ThisBuild / organization := "org.coinductive"
+ThisBuild / organization := "io.github.coinductive"
 
 val Scala2 = "2.13.18"
 val Scala3 = "3.7.4"
