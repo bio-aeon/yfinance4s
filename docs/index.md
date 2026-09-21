@@ -21,6 +21,16 @@ YFinance4s is an effectful Yahoo Finance client for Scala, built on Cats Effect 
 - **Batch Operations**: Parallel multi-ticker fetches with configurable concurrency and error-tolerant modes
 - **Rate Limiting**: Built-in outbound request pacing (interval-based, configurable, on by default) to avoid Yahoo throttling
 
+## Installation
+
+```scala
+// JVM
+libraryDependencies += "io.github.coinductive" %% "yfinance4s" % "0.1.0"
+
+// Scala.js
+libraryDependencies += "io.github.coinductive" %%% "yfinance4s" % "0.1.0"
+```
+
 ## Platform Support
 
 - **Scala 2.13 & Scala 3**

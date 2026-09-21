@@ -2,6 +2,18 @@ import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
 ThisBuild / organization := "io.github.coinductive"
 
+val RepositoryUrl = url("https://github.com/coinductive/yfinance4s")
+
+ThisBuild / homepage := Some(RepositoryUrl)
+ThisBuild / scmInfo := Some(ScmInfo(RepositoryUrl, s"scm:git:$RepositoryUrl.git"))
+ThisBuild / licenses := List(License.Apache2)
+ThisBuild / developers := List(
+  Developer("coinductive", "Iver", "coinductive@yahoo.com", url("https://github.com/coinductive"))
+)
+ThisBuild / versionScheme := Some("early-semver")
+// Release tags are plain `X.Y.Z` (the CI tag trigger), not sbt-dynver's default `vX.Y.Z`
+ThisBuild / dynverVTagPrefix := false
+
 val Scala2 = "2.13.18"
 val Scala3 = "3.7.4"
 
@@ -26,6 +38,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("core"))
   .settings(
     name := "yfinance4s",
+    description := "Effectful Yahoo Finance client in the Scala programming language.",
 
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
@@ -67,3 +80,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
+
+lazy val root = project
+  .in(file("."))
+  .aggregate(coreJVM, coreJS)
+  .settings(publish / skip := true)

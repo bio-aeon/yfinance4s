@@ -26,6 +26,18 @@ Effectful Yahoo Finance client in the Scala programming language.
 - **Cross-Platform**: JVM and Scala.js
 - **Scala 2.13 & Scala 3**
 
+## Installation
+
+Published to Maven Central for Scala 2.13 and Scala 3:
+
+```scala
+// JVM
+libraryDependencies += "io.github.coinductive" %% "yfinance4s" % "0.1.0"
+
+// Scala.js (see Scala.js Setup below)
+libraryDependencies += "io.github.coinductive" %%% "yfinance4s" % "0.1.0"
+```
+
 ## Quick Start
 
 ```scala
