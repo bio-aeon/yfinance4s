@@ -20,6 +20,8 @@ clientResource.use { client =>
 }
 ```
 
+Yahoo occasionally reports a timestamp without any prices, for a day it has no data for. Such a row yields no quote, while a dividend or split on that day is still listed; a bar whose volume Yahoo leaves out reports a volume of `0`.
+
 ## Date Range Queries
 
 ```scala

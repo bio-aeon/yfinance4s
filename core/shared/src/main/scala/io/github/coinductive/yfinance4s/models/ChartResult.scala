@@ -10,7 +10,8 @@ import java.time.ZonedDateTime
   * dividend or split events that occurred during the requested time period.
   *
   * @param quotes
-  *   List of OHLCV price quotes, sorted chronologically.
+  *   List of OHLCV price quotes, sorted chronologically. A timestamp for which Yahoo reports no prices yields no quote;
+  *   a dividend or split on it is still listed.
   * @param dividends
   *   List of dividend events within the chart period, sorted chronologically.
   * @param splits
@@ -46,13 +47,13 @@ object ChartResult {
     * @param open
     *   Opening price.
     * @param volume
-    *   Trading volume (number of shares traded).
+    *   Trading volume (number of shares traded); 0 where Yahoo reports none.
     * @param high
     *   Highest price during the period.
     * @param low
     *   Lowest price during the period.
     * @param adjclose
-    *   Adjusted closing price (accounts for dividends and splits).
+    *   Adjusted closing price (accounts for dividends and splits); equal to `close` where Yahoo reports none.
     * @param repaired
     *   Whether any O/H/L/C/Adj Close or volume value in this bar was altered by price repair (see
     *   [[PriceRepairConfig]]). Always false when repair is disabled.

@@ -44,13 +44,13 @@ class DividendFxSpec extends FunSuite {
 
   /** Instrument data whose dividends carry the given (bar index, currency label) pairs. */
   private def dataWith(currency: String, dividends: (Int, Option[String])*): InstrumentData = {
-    val prices = List.fill(4)(100.0)
+    val prices = List.fill(4)(Option(100.0))
     InstrumentData(
       meta = metaRaw(currency),
       timestamp = prices.indices.map(epochAt).toList,
       indicators = Indicators(
         quote = NonEmptyList.one(
-          Quote(close = prices, open = prices, volume = List.fill(4)(1000L), high = prices, low = prices)
+          Quote(close = prices, open = prices, volume = List.fill(4)(Option(1000L)), high = prices, low = prices)
         ),
         adjclose = NonEmptyList.one(AdjClose(prices))
       ),
@@ -65,18 +65,18 @@ class DividendFxSpec extends FunSuite {
     )
   }
 
-  /** A daily FX chart of flat bars. */
-  private def fxChart(closes: Vector[Double]): Chart = {
+  /** A daily FX chart of flat bars; `None` is a row Yahoo reports without a price. */
+  private def fxChart(closes: Vector[Option[Double]]): Chart = {
     val values = closes.toList
+    val volumes = List.fill(closes.size)(Option(1000L))
     Chart(
       List(
         InstrumentData(
           meta = metaRaw("USD"),
           timestamp = closes.indices.map(epochAt).toList,
           indicators = Indicators(
-            quote = NonEmptyList.one(
-              Quote(close = values, open = values, volume = List.fill(closes.size)(1000L), high = values, low = values)
-            ),
+            quote =
+              NonEmptyList.one(Quote(close = values, open = values, volume = volumes, high = values, low = values)),
             adjclose = NonEmptyList.one(AdjClose(values))
           ),
           events = None
@@ -213,12 +213,12 @@ class DividendFxSpec extends FunSuite {
   }
 
   test("takes the newest finite positive close as the rate") {
-    val chart = fxChart(Vector(1.20, 1.25, 1.30, 0.0, Double.NaN))
+    val chart = fxChart(Vector(Some(1.20), Some(1.25), Some(1.30), Some(0.0), None))
     assertEquals(DividendFxConversion.lastUsableClose(Ticker("GBP=X"), chart), Some(1.30))
   }
 
   test("repairs a corrupt final rate bar before use") {
-    val chart = fxChart(Vector(1.30, 1.30, 1.30, 1.30, 130.0))
+    val chart = fxChart(Vector(1.30, 1.30, 1.30, 1.30, 130.0).map(Option(_)))
     val rate = DividendFxConversion.lastUsableClose(Ticker("GBP=X"), chart).getOrElse(fail("expected a rate"))
 
     assert(math.abs(rate - 1.30) < 0.001, s"the corrupt final bar should be repaired, got $rate")

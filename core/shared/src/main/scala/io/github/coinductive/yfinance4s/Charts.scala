@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import io.github.coinductive.yfinance4s.models.*
 import io.github.coinductive.yfinance4s.models.internal.{Chart, InstrumentData, YFinanceQuoteResult}
 
-import java.time.{Instant, ZoneOffset, ZonedDateTime}
+import java.time.ZonedDateTime
 
 /** Algebra for historical chart data, stock quotes, and corporate actions. */
 trait Charts[F[_]] {
@@ -189,24 +189,21 @@ private[yfinance4s] object Charts {
         interval: Interval,
         repair: PriceRepairConfig,
         chart: Chart
-    ): F[Option[ChartResult]] =
-      PriceRepairConfig.resolve(repair) match {
-        case PriceRepairConfig.Custom(false, false, false, false) =>
-          MonadThrow[F].pure(mapChart(chart)) // fast path: byte-identical to the unrepaired mapping
-        case cfg =>
-          fxRatesFor(chart, cfg).flatMap { rates =>
-            PriceRepair.prepare(chart, ticker, interval, cfg, rates) match {
-              case None =>
-                MonadThrow[F].pure(None)
-              case Some(prepared) if prepared.tags.isEmpty =>
-                MonadThrow[F].pure(Some(PriceRepair.complete(prepared, PriceRepair.Reconstruction.empty)))
-              case Some(prepared) =>
-                reconstructor
-                  .reconstruct(ticker, interval, prepared.bars, prepared.tags)
-                  .map(recon => Some(PriceRepair.complete(prepared, recon)))
-            }
-          }
+    ): F[Option[ChartResult]] = {
+      val cfg = PriceRepairConfig.resolve(repair)
+      fxRatesFor(chart, cfg).flatMap { rates =>
+        PriceRepair.prepare(chart, ticker, interval, cfg, rates) match {
+          case None =>
+            MonadThrow[F].pure(None)
+          case Some(prepared) if prepared.tags.isEmpty =>
+            MonadThrow[F].pure(Some(PriceRepair.complete(prepared, PriceRepair.Reconstruction.empty)))
+          case Some(prepared) =>
+            reconstructor
+              .reconstruct(ticker, interval, prepared.bars, prepared.tags)
+              .map(recon => Some(PriceRepair.complete(prepared, recon)))
+        }
       }
+    }
 
     /** Resolved FX rates for the chart's mismatched dividend currencies; empty (and fetch-free) when conversion is off
       * or nothing mismatches.
@@ -215,28 +212,6 @@ private[yfinance4s] object Charts {
       chart.result.headOption.map(DividendFxConversion.requiredPlans(_, cfg)) match {
         case Some(plans) if plans.nonEmpty => DividendFxConversion.resolveRates(plans, fxRateSource)
         case _                             => MonadThrow[F].pure(Map.empty)
-      }
-
-    private def mapChart(chart: Chart): Option[ChartResult] =
-      chart.result.headOption.map { data =>
-        val quotes = data.timestamp.indices.map { i =>
-          val quote = data.indicators.quote.head
-          val adjclose = data.indicators.adjclose.head
-          ChartResult.Quote(
-            ZonedDateTime.ofInstant(Instant.ofEpochSecond(data.timestamp(i)), ZoneOffset.UTC),
-            quote.close(i),
-            quote.open(i),
-            quote.volume(i),
-            quote.high(i),
-            quote.low(i),
-            adjclose.adjclose(i)
-          )
-        }.toList
-
-        val dividends = extractDividendsFromData(data)
-        val splits = extractSplitsFromData(data)
-
-        ChartResult(quotes, dividends, splits, data.meta.currency)
       }
 
     private def extractDividends(chart: Chart): Option[List[DividendEvent]] =

@@ -80,18 +80,18 @@ private[yfinance4s] object Indicators {
 }
 
 private[yfinance4s] final case class Quote(
-    close: List[Double],
-    open: List[Double],
-    volume: List[Long],
-    high: List[Double],
-    low: List[Double]
+    close: List[Option[Double]],
+    open: List[Option[Double]],
+    volume: List[Option[Long]],
+    high: List[Option[Double]],
+    low: List[Option[Double]]
 )
 
 private[yfinance4s] object Quote {
   implicit val decoder: Decoder[Quote] = deriveDecoder
 }
 
-private[yfinance4s] final case class AdjClose(adjclose: List[Double])
+private[yfinance4s] final case class AdjClose(adjclose: List[Option[Double]])
 
 private[yfinance4s] object AdjClose {
   implicit val decoder: Decoder[AdjClose] = deriveDecoder

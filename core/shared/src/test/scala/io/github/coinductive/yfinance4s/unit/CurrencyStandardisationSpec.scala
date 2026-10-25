@@ -209,6 +209,20 @@ class CurrencyStandardisationSpec extends FunSuite {
     assertClose(result(2).dividend, 1.5, "the ffilled close drives the verdict")
   }
 
+  test("scales unlabelled dividends when the chart opens on a bar without prices") {
+    // Bar 1's dividend has no previous close, so no yield; bar 3's yield of 77 / 24.8 decides for both.
+    val bars = Vector(
+      bar(0, Double.NaN, volume = 0L),
+      bar(1, 2450.0, dividend = 77.0),
+      bar(2, 2480.0),
+      bar(3, 2500.0, dividend = 77.0)
+    )
+    val (result, _) = CurrencyStandardisation.standardise(bars, meta("GBp"))
+
+    assertClose(result(1).dividend, 0.77, "a dividend without a yield converts with the rest")
+    assertClose(result(3).dividend, 0.77, "the missing first price must not void the check")
+  }
+
   test("standardises a subunit-labelled dividend without the heuristic") {
     val bars = penceCloses.updated(2, bar(2, 2500.0, dividend = 0.77, dividendCurrency = Some("GBp")))
     val (result, currency) = CurrencyStandardisation.standardise(bars, meta("GBp"))

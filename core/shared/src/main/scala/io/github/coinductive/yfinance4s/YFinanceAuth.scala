@@ -86,12 +86,18 @@ private object YFinanceAuth {
       retries: Int,
       rateLimiter: RateLimiter[F]
   ): Resource[F, YFinanceAuth[F]] =
-    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).evalMap { backend =>
-      val retryPolicy = RetryPolicies.limitRetries[F](retries)
-      Ref.of[F, Option[YFinanceCredentials]](None).map { credentialsRef =>
-        new YFinanceAuthImpl[F](backend, retryPolicy, rateLimiter, credentialsRef)
-      }
+    PlatformSttpBackend.resource[F](connectTimeout, readTimeout).evalMap(apply[F](retries, _, rateLimiter))
+
+  def apply[F[_]: Async](
+      retries: Int,
+      sttpBackend: SttpBackend[F, Any],
+      rateLimiter: RateLimiter[F]
+  ): F[YFinanceAuth[F]] = {
+    val retryPolicy = RetryPolicies.limitRetries[F](retries)
+    Ref.of[F, Option[YFinanceCredentials]](None).map { credentialsRef =>
+      new YFinanceAuthImpl[F](sttpBackend, retryPolicy, rateLimiter, credentialsRef)
     }
+  }
 
   private final class YFinanceAuthImpl[F[_]](
       sttpBackend: SttpBackend[F, Any],

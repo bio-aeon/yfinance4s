@@ -76,8 +76,10 @@ private[yfinance4s] object PriceRepair {
     */
   final case class Context(currency: String, interval: Interval, isFx: Boolean)
 
-  /** Index-addressable working row. Missing prices are `Double.NaN`; missing volume is `0`. `dividendCurrency` is
-    * Yahoo's per-dividend label, rewritten in lockstep with `dividend` by whichever pass touches the amount.
+  /** Index-addressable working row. Missing prices are `Double.NaN`, except a missing adjusted close, which falls back
+    * to the close: a bar Yahoo reports without one is a bar it left unadjusted. Missing volume is `0`.
+    * `dividendCurrency` is Yahoo's per-dividend label, rewritten in lockstep with `dividend` by whichever pass touches
+    * the amount.
     */
   final case class Bar(
       datetime: ZonedDateTime,
@@ -129,8 +131,8 @@ private[yfinance4s] object PriceRepair {
   /** Runs the pure half of the repair pipeline: currency standardisation and dividend FX application (every interval),
     * then the 100x family and zero/NaN detection (daily and intraday only). `fxRates` are the rates resolved for this
     * chart's mismatched dividend currencies, empty when conversion is off or nothing mismatched. Returns `None` iff the
-    * chart carries no result data. A guarded-off chart yields untouched bars and empty tags, so `complete` reproduces
-    * the unrepaired mapping.
+    * chart carries no result data. Each pass runs only when its flag is on, so with repair disabled the bars stay as
+    * Yahoo reported them and the tags stay empty.
     */
   def prepare(
       chart: Chart,
@@ -156,14 +158,16 @@ private[yfinance4s] object PriceRepair {
       } else Prepared(data, converted, ZeroTags.empty, label)
     }
 
-  /** Applies the reconstruction (restoring originals for uncovered tags) and assembles the final [[ChartResult]]. The
-    * dividends list is rebuilt from the repaired bars so a switch-scaled or converted dividend surfaces as such; splits
-    * are re-attached from the raw events unchanged.
+  /** Applies the reconstruction (restoring originals for uncovered tags) and assembles the final [[ChartResult]]. A bar
+    * still missing a price yields no quote. The dividends list is rebuilt from all bars, so a switch-scaled or
+    * converted dividend surfaces as such, even on a bar left out of the quotes; splits are re-attached from the raw
+    * events unchanged.
     */
   def complete(prepared: Prepared, recon: Reconstruction): ChartResult = {
     val bars = applyReconstruction(prepared.bars, prepared.tags, recon)
-    val quotes = bars.map { b =>
-      ChartResult.Quote(b.datetime, b.close, b.open, b.volume, b.high, b.low, b.adjClose, b.repaired)
+    val quotes = bars.collect {
+      case b if hasEveryPrice(b) =>
+        ChartResult.Quote(b.datetime, b.close, b.open, b.volume, b.high, b.low, b.adjClose, b.repaired)
     }.toList
     ChartResult(quotes, rebuiltDividends(prepared.data, bars), rawSplits(prepared.data), prepared.currency)
   }
@@ -195,8 +199,12 @@ private[yfinance4s] object PriceRepair {
       .toList
       .sorted
 
-  /** Converts decoded instrument data to working bars. Repair never adds, drops, or reorders rows. */
+  /** Converts decoded instrument data to working bars, one per timestamp: repair never adds, drops, or reorders rows. A
+    * row Yahoo sent without prices stays in as a bar of `NaN` prices, so detection sees the gap; `complete` leaves it
+    * out of the quotes.
+    */
   def toBars(data: InstrumentData): Vector[Bar] = {
+    def price(cell: Option[Double]): Double = cell.getOrElse(Double.NaN)
     val quote = data.indicators.quote.head
     val adjclose = data.indicators.adjclose.head
     val opens = quote.open.toVector
@@ -220,12 +228,12 @@ private[yfinance4s] object PriceRepair {
     data.timestamp.zipWithIndex.map { case (ts, i) =>
       Bar(
         datetime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(ts), ZoneOffset.UTC),
-        open = opens(i),
-        high = highs(i),
-        low = lows(i),
-        close = closes(i),
-        adjClose = adjCloses(i),
-        volume = volumes(i),
+        open = price(opens(i)),
+        high = price(highs(i)),
+        low = price(lows(i)),
+        close = price(closes(i)),
+        adjClose = price(adjCloses(i).orElse(closes(i))),
+        volume = volumes(i).getOrElse(0L),
         dividend = dividendAmounts.getOrElse(ts, 0.0),
         splitRatio = splitFactors.getOrElse(ts, 0.0),
         repaired = false,
@@ -629,6 +637,8 @@ private[yfinance4s] object PriceRepair {
   private def hasZeroOrNaNPrice(b: Bar): Boolean =
     isZeroOrNaN(b.open) || isZeroOrNaN(b.high) || isZeroOrNaN(b.low) || isZeroOrNaN(b.close) ||
       isZeroOrNaN(b.adjClose)
+
+  private def hasEveryPrice(b: Bar): Boolean = AllPriceColumns.forall(c => !priceAt(b, c).isNaN)
 
   private def zeroOrNaNColumns(b: Bar): Set[PriceColumn] =
     AllPriceColumns.filter(c => isZeroOrNaN(priceAt(b, c))).toSet

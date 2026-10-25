@@ -59,13 +59,9 @@ class InternationalCurrencySpec extends CatsEffectSuite {
   }
 
   test("repair with conversion enabled never fails an international fetch") {
-    // The equity window is fixed and fully elapsed: a live range can include a null holiday bar, which
-    // the chart decoder rejects before repair is ever reached (a known limitation, unrelated to repair).
-    val since = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
-    val until = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
     YFinanceClient.resource[IO](config).use { client =>
       for {
-        equity <- client.charts.getChart(penceQuoted, Interval.`1Day`, since, until, PriceRepairConfig.Enabled)
+        equity <- client.charts.getChart(penceQuoted, Interval.`1Day`, Range.`2Years`, PriceRepairConfig.Enabled)
         fx <- client.charts.getChart(Ticker("GBPUSD=X"), Interval.`1Day`, Range.`1Month`, PriceRepairConfig.Enabled)
       } yield {
         assert(equity.exists(_.quotes.nonEmpty), "the equity fetch should return bars")

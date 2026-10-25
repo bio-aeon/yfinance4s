@@ -67,7 +67,7 @@ The error repairs apply to daily and intraday intervals only; currency standardi
 ### Charts
 
 **ChartResult** - Historical OHLCV data and corporate actions:
-- `quotes`: List of OHLCV price quotes (datetime, open, high, low, close, volume, adjclose, repaired - true when price repair altered the bar)
+- `quotes`: List of OHLCV price quotes (datetime, open, high, low, close, volume, adjclose, repaired - true when price repair altered the bar); a timestamp Yahoo reports without prices yields no quote
 - `dividends`: List of dividend events within the chart period
 - `splits`: List of stock split events within the chart period
 - `corporateActions`: Combined dividends and splits as `CorporateActions`

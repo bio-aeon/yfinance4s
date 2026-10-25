@@ -36,16 +36,16 @@ class PriceRepairConfigSpec extends FunSuite {
   /** A daily chart of flat bars (all OHLC and adj close equal to the given price). */
   private def chartOf(prices: Vector[Double], meta: ChartMetaRaw = metaRaw()): Chart = {
     val timestamps = prices.indices.map(i => baseEpoch + i * daySeconds).toList
-    val values = prices.toList
+    val values = prices.toList.map(Option(_))
+    val volumes = List.fill(prices.size)(Option(1000L))
     Chart(
       List(
         InstrumentData(
           meta = meta,
           timestamp = timestamps,
           indicators = Indicators(
-            quote = NonEmptyList.one(
-              Quote(close = values, open = values, volume = List.fill(prices.size)(1000L), high = values, low = values)
-            ),
+            quote =
+              NonEmptyList.one(Quote(close = values, open = values, volume = volumes, high = values, low = values)),
             adjclose = NonEmptyList.one(AdjClose(values))
           ),
           events = None
@@ -89,6 +89,18 @@ class PriceRepairConfigSpec extends FunSuite {
       math.abs(currencyResult.bars(3).close - 25.0) < 1e-9,
       s"expected the 100x bar fixed in pounds, got ${currencyResult.bars(3).close}"
     )
+  }
+
+  test("disabled resolves to no repair at all") {
+    val disabled = PriceRepairConfig.resolve(PriceRepairConfig.Disabled)
+    val result = prepared(disabled)
+    assertEquals(result.bars(3).close, 1000.0)
+    assert(result.bars.forall(!_.repaired), "no bar is repaired when repair is disabled")
+    assert(result.tags.isEmpty, "zero detection should be off")
+
+    val currencyResult = prepared(disabled, penceWith100x)
+    assertEquals(currencyResult.currency, "GBp", "disabled must not standardise")
+    assertEquals(currencyResult.bars(0).close, 2450.0)
   }
 
   test("standardises without repairing when only standardisation is on") {

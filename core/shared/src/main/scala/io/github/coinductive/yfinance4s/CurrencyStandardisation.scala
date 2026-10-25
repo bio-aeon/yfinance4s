@@ -46,8 +46,8 @@ private[yfinance4s] object CurrencyStandardisation {
     if (!standardise) raw
     else
       SubunitCurrencies.get(raw) match {
-        case Some(subunit) if data.indicators.quote.head.volume.exists(_ > 0L) => subunit.majorCurrency
-        case _                                                                 => raw
+        case Some(subunit) if data.indicators.quote.head.volume.flatten.exists(_ > 0L) => subunit.majorCurrency
+        case _                                                                         => raw
       }
   }
 
@@ -107,16 +107,18 @@ private[yfinance4s] object CurrencyStandardisation {
     )
 
   /** Scales unlabelled dividends when their average yield against the previous close is impossibly high - the sign that
-    * Yahoo reported them in the subunit while the prices came in the major unit.
+    * Yahoo reported them in the subunit while the prices came in the major unit. A dividend whose previous close is
+    * unknown, as when the chart opens on bars without prices, has no yield and is left out of the average; upstream's
+    * average turns NaN instead, which voids the check for every dividend.
     */
   private def scaleRidiculousDividends(bars: Vector[PriceRepair.Bar], factor: Double): Vector[PriceRepair.Bar] = {
     val eligible = bars.indices.filter(i => bars(i).dividend != 0.0 && bars(i).dividendCurrency.isEmpty)
     if (eligible.isEmpty) bars
     else {
       val prevCloses = previousCloses(bars)
-      val yields = eligible.map(i => bars(i).dividend / prevCloses(i))
+      val yields = eligible.map(i => bars(i).dividend / prevCloses(i)).filterNot(_.isNaN)
       val average = yields.sum / yields.length
-      if (average > RidiculousYieldThreshold)
+      if (yields.nonEmpty && average > RidiculousYieldThreshold)
         eligible.foldLeft(bars)((acc, i) => acc.updated(i, acc(i).copy(dividend = acc(i).dividend * factor)))
       else bars
     }

@@ -62,16 +62,16 @@ class PriceRepairPipelineSpec extends FunSuite {
       events: Option[Events] = None
   ): Chart = {
     val timestamps = prices.indices.map(epochAt).toList
-    val values = prices.toList
+    val values = prices.toList.map(Option(_))
+    val volumes = List.fill(prices.size)(Option(1000L))
     Chart(
       List(
         InstrumentData(
           meta = meta,
           timestamp = timestamps,
           indicators = Indicators(
-            quote = NonEmptyList.one(
-              Quote(close = values, open = values, volume = List.fill(prices.size)(1000L), high = values, low = values)
-            ),
+            quote =
+              NonEmptyList.one(Quote(close = values, open = values, volume = volumes, high = values, low = values)),
             adjclose = NonEmptyList.one(AdjClose(values))
           ),
           events = events
