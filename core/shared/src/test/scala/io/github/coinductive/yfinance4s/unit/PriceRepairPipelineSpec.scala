@@ -13,6 +13,7 @@ class PriceRepairPipelineSpec extends FunSuite {
 
   private val baseEpoch = 1704067200L // 2024-01-01T00:00:00Z
   private val daySeconds = 86400L
+  private val weekSeconds = 7 * daySeconds
   private val ticker = Ticker("TEST")
   private val enabled = PriceRepairConfig.resolve(PriceRepairConfig.Enabled)
 
@@ -55,13 +56,16 @@ class PriceRepairPipelineSpec extends FunSuite {
       splits = None
     )
 
-  /** A daily chart of flat bars (all OHLC and adj close equal to the given price). */
+  /** A chart of flat bars (all OHLC and adj close equal to the given price), `spacing` seconds apart: a day, unless the
+    * chart stands for a longer interval.
+    */
   private def chartOf(
       prices: Vector[Double],
       meta: ChartMetaRaw = metaRaw(),
-      events: Option[Events] = None
+      events: Option[Events] = None,
+      spacing: Long = daySeconds
   ): Chart = {
-    val timestamps = prices.indices.map(epochAt).toList
+    val timestamps = prices.indices.map(i => baseEpoch + i * spacing).toList
     val values = prices.toList.map(Option(_))
     val volumes = List.fill(prices.size)(Option(1000L))
     Chart(
@@ -86,11 +90,12 @@ class PriceRepairPipelineSpec extends FunSuite {
       fxRates: Map[String, Double] = Map.empty
   ): ChartResult =
     PriceRepair
-      .prepare(chart, ticker, interval, enabled, fxRates)
+      .prepare(chart, ticker, interval, None, enabled, fxRates)
       .map(PriceRepair.complete(_, Reconstruction.empty))
       .getOrElse(fail("expected chart data"))
 
-  private val planted100x = chartOf(Vector(10.0, 10.0, 10.0, 1000.0, 10.0, 10.0))
+  private val planted100xPrices = Vector(10.0, 10.0, 10.0, 1000.0, 10.0, 10.0)
+  private val planted100x = chartOf(planted100xPrices)
 
   // Chronological switch shape: the older half 100x too large.
   private val switchPrices = Vector.tabulate(60)(i => if (i < 30) 10000.0 else 100.0)
@@ -156,13 +161,13 @@ class PriceRepairPipelineSpec extends FunSuite {
   }
 
   test("passes a 5d chart through unrepaired") {
-    val result = repairedResult(planted100x, interval = Interval.`5Days`)
+    val result = repairedResult(chartOf(planted100xPrices, spacing = 5 * daySeconds), interval = Interval.`5Days`)
     assertEquals(result.quotes(3).close, 1000.0)
     assert(result.quotes.forall(!_.repaired), "no bar should be repaired for a 5d chart")
   }
 
   test("passes a weekly chart through unrepaired") {
-    val result = repairedResult(planted100x, interval = Interval.`1Week`)
+    val result = repairedResult(chartOf(planted100xPrices, spacing = weekSeconds), interval = Interval.`1Week`)
     assertEquals(result.quotes(3).close, 1000.0)
     assert(result.quotes.forall(!_.repaired), "no bar should be repaired for a weekly chart")
   }
@@ -216,7 +221,8 @@ class PriceRepairPipelineSpec extends FunSuite {
   }
 
   test("standardises a weekly pence chart without repairing it") {
-    val chart = chartOf(Vector(2450.0, 2480.0, 248000.0, 2460.0), meta = metaRaw(currency = "GBp"))
+    val chart =
+      chartOf(Vector(2450.0, 2480.0, 248000.0, 2460.0), meta = metaRaw(currency = "GBp"), spacing = weekSeconds)
     val result = repairedResult(chart, interval = Interval.`1Week`)
 
     assertEquals(result.currency, "GBP")
@@ -233,7 +239,7 @@ class PriceRepairPipelineSpec extends FunSuite {
     )
     val disabled = PriceRepairConfig.resolve(PriceRepairConfig.Disabled)
     val result = PriceRepair
-      .prepare(chart, ticker, Interval.`1Day`, disabled)
+      .prepare(chart, ticker, Interval.`1Day`, None, disabled)
       .map(PriceRepair.complete(_, Reconstruction.empty))
       .getOrElse(fail("expected chart data"))
 

@@ -18,10 +18,11 @@ class ChartsSpec extends CatsEffectSuite {
     retries = 1
   )
 
+  private val since = ZonedDateTime.of(2026, 7, 27, 0, 0, 0, 0, ZoneOffset.UTC)
+  private val until = ZonedDateTime.of(2026, 8, 1, 0, 0, 0, 0, ZoneOffset.UTC)
+
   test("getChart for VOD.L reads a window in which Yahoo reports a day without data") {
     // Yahoo reports no data for VOD.L on 2026-07-30.
-    val since = ZonedDateTime.of(2026, 7, 27, 0, 0, 0, 0, ZoneOffset.UTC)
-    val until = ZonedDateTime.of(2026, 8, 1, 0, 0, 0, 0, ZoneOffset.UTC)
     YFinanceClient.resource[IO](config).use { client =>
       client.charts.getChart(Ticker("VOD.L"), Interval.`1Day`, since, until).map { chart =>
         val quotes = chart.getOrElse(fail("expected chart data")).quotes
@@ -50,6 +51,19 @@ class ChartsSpec extends CatsEffectSuite {
         val flags = chart.getOrElse(fail("expected chart data")).quotes.map(_.inProgress)
         assertEquals(flags.lastOption, Some(true), "today's bar")
         assert(!flags.init.contains(true), s"expected only today's bar in progress, got $flags")
+      }
+    }
+  }
+
+  test("getChart for SPY keeps the hourly bars of a past window inside it") {
+    YFinanceClient.resource[IO](config).use { client =>
+      client.charts.getChart(Ticker("SPY"), Interval.`1Hour`, since, until).map { chart =>
+        val quotes = chart.getOrElse(fail("expected chart data")).quotes
+        assert(quotes.nonEmpty, "the window has trading hours")
+        assert(
+          quotes.forall(_.datetime.isBefore(until)),
+          s"expected no bar from $until on, got ${quotes.last.datetime}"
+        )
       }
     }
   }

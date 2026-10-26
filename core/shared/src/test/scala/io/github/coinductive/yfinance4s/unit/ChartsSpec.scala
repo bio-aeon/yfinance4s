@@ -70,6 +70,27 @@ class ChartsSpec extends CatsEffectSuite {
       |  }
       |}], "error": null}}""".stripMargin
 
+  /** SPY's last two hourly bars for 2026-07-27 to 2026-07-31 as Yahoo served the window before the 2026-10-26 session,
+    * followed by its latest-price row from 2026-10-23.
+    */
+  private val spyPastHourly =
+    """{"chart": {"result": [{
+      |  "meta": {"currency": "USD", "symbol": "SPY", "exchangeName": "PCX", "instrumentType": "ETF",
+      |    "regularMarketTime": 1792785600, "gmtoffset": -14400, "timezone": "EDT",
+      |    "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 759.97, "dataGranularity": "1h",
+      |    "range": ""},
+      |  "timestamp": [1785522600, 1785526200, 1792785600],
+      |  "indicators": {
+      |    "quote": [{
+      |      "open": [746.04, 747.49, 759.97],
+      |      "high": [747.92, 748.895, 759.97],
+      |      "low": [745.67, 746.34, 759.97],
+      |      "close": [747.49, 746.81, 759.97],
+      |      "volume": [7842744, 10315583, 0]
+      |    }]
+      |  }
+      |}], "error": null}}""".stripMargin
+
   private val toyota = Ticker("7203.T")
 
   /** A moment in October 2026, in UTC. */
@@ -210,5 +231,12 @@ class ChartsSpec extends CatsEffectSuite {
     chartsServing(tokyoHourly)
       .flatMap(_.getChart(toyota, Interval.`1Hour`, Range.`1Day`))
       .map(chart => assertEquals(chart.map(barsInProgress), Some(Nil)))
+  }
+
+  test("getChart leaves out the latest-price row Yahoo appends after a past window") {
+    val lastTwoHours = List(18, 19).map(hour => ZonedDateTime.of(2026, 7, 31, hour, 30, 0, 0, ZoneOffset.UTC))
+    chartsServing(spyPastHourly)
+      .flatMap(_.getChart(spy, Interval.`1Hour`, since, until))
+      .map(chart => assertEquals(chart.map(_.quotes.map(_.datetime)), Some(lastTwoHours)))
   }
 }

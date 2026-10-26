@@ -26,6 +26,8 @@ Yahoo sends no adjusted closes for intraday intervals, so on an intraday chart e
 
 While a session is open, a daily chart ends with a bar for that session whose close is the latest price. That quote carries `inProgress = true`, so `chart.quotes.filterNot(_.inProgress)` keeps only sessions that have closed. Quotes of other intervals are never marked.
 
+Yahoo also adds a row for its latest price to most charts, which is not a bar of the chart's interval. It is folded into the bar it falls in: an intraday chart's last bar closes at the latest price, or once the session has ended at its closing price, and a weekly or monthly bar takes in the latest session. A chart requested by dates leaves the row out when Yahoo stamps it outside the window.
+
 ## Date Range Queries
 
 ```scala

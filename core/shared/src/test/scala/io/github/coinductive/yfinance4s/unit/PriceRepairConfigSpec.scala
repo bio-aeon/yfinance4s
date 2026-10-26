@@ -62,7 +62,7 @@ class PriceRepairConfigSpec extends FunSuite {
     chartOf(Vector(2450.0, 2480.0, 2500.0, 250000.0, 2460.0, 2470.0), meta = metaRaw(currency = "GBp"))
 
   private def prepared(cfg: PriceRepairConfig.Custom, chart: Chart = mixedDefects): PriceRepair.Prepared =
-    PriceRepair.prepare(chart, ticker, Interval.`1Day`, cfg).getOrElse(fail("expected a prepared pipeline"))
+    PriceRepair.prepare(chart, ticker, Interval.`1Day`, None, cfg).getOrElse(fail("expected a prepared pipeline"))
 
   test("fixes only 100x errors when zero repair is off") {
     val result = prepared(PriceRepairConfig.Custom(fix100xErrors = true, fixZeroes = false))

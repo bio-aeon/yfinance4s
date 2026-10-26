@@ -106,7 +106,7 @@ private[yfinance4s] object Charts {
         range: Range,
         repair: PriceRepairConfig
     ): F[Option[ChartResult]] =
-      gateway.getChart(ticker, interval, range).flatMap(mapAndRepair(ticker, interval, repair, _))
+      gateway.getChart(ticker, interval, range).flatMap(mapAndRepair(ticker, interval, None, repair, _))
 
     def getChart(
         ticker: Ticker,
@@ -122,7 +122,9 @@ private[yfinance4s] object Charts {
         until: ZonedDateTime,
         repair: PriceRepairConfig
     ): F[Option[ChartResult]] =
-      gateway.getChart(ticker, interval, since, until).flatMap(mapAndRepair(ticker, interval, repair, _))
+      gateway
+        .getChart(ticker, interval, since, until)
+        .flatMap(mapAndRepair(ticker, interval, Some(LatestPriceRow.Window(since, until)), repair, _))
 
     def getStock(ticker: Ticker): F[Option[StockResult]] =
       for {
@@ -187,12 +189,13 @@ private[yfinance4s] object Charts {
     private def mapAndRepair(
         ticker: Ticker,
         interval: Interval,
+        window: Option[LatestPriceRow.Window],
         repair: PriceRepairConfig,
         chart: Chart
     ): F[Option[ChartResult]] = {
       val cfg = PriceRepairConfig.resolve(repair)
       fxRatesFor(chart, cfg).flatMap { rates =>
-        PriceRepair.prepare(chart, ticker, interval, cfg, rates) match {
+        PriceRepair.prepare(chart, ticker, interval, window, cfg, rates) match {
           case None =>
             MonadThrow[F].pure(None)
           case Some(prepared) if prepared.tags.isEmpty =>

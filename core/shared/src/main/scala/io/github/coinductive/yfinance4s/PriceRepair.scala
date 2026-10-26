@@ -134,22 +134,24 @@ private[yfinance4s] object PriceRepair {
       currency: String
   )
 
-  /** Runs the pure half of the repair pipeline: currency standardisation and dividend FX application (every interval),
-    * then the 100x family and zero/NaN detection (daily and intraday only). `fxRates` are the rates resolved for this
-    * chart's mismatched dividend currencies, empty when conversion is off or nothing mismatched. Returns `None` iff the
-    * chart carries no result data. Each pass runs only when its flag is on, so with repair disabled the bars stay as
-    * Yahoo reported them and the tags stay empty.
+  /** Settles Yahoo's latest-price row into the bars (see [[LatestPriceRow]]), then runs the pure half of the repair
+    * pipeline: currency standardisation and dividend FX application (every interval), then the 100x family and zero/NaN
+    * detection (daily and intraday only). `window` holds the bounds of a chart requested by dates. `fxRates` are the
+    * rates resolved for this chart's mismatched dividend currencies, empty when conversion is off or nothing
+    * mismatched. Returns `None` iff the chart carries no result data. Each pass runs only when its flag is on, so with
+    * repair disabled the settled bars pass through unchanged and the tags stay empty.
     */
   def prepare(
       chart: Chart,
       ticker: Ticker,
       interval: Interval,
+      window: Option[LatestPriceRow.Window],
       cfg: PriceRepairConfig.Custom,
       fxRates: Map[String, Double] = Map.empty
   ): Option[Prepared] =
     chart.result.headOption.map { data =>
       val meta = data.meta
-      val bars = toBars(data)
+      val bars = LatestPriceRow.settle(toBars(data), interval, meta, window)
       val (standardised, label) =
         if (cfg.standardiseCurrency) CurrencyStandardisation.standardise(bars, meta)
         else (bars, meta.currency)
@@ -186,7 +188,7 @@ private[yfinance4s] object PriceRepair {
     */
   private def rebuiltDividends(data: InstrumentData, bars: Vector[Bar]): List[DividendEvent] = {
     val dividendByEpoch: Map[Long, (Double, Option[String])] =
-      data.timestamp.zip(bars).map { case (ts, b) => ts -> (b.dividend, b.dividendCurrency) }.toMap
+      bars.map(b => b.datetime.toEpochSecond -> (b.dividend, b.dividendCurrency)).toMap
     data.events
       .flatMap(_.dividends)
       .getOrElse(Map.empty)
