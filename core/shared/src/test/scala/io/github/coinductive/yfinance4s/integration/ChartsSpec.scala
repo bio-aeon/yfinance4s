@@ -3,7 +3,7 @@ package io.github.coinductive.yfinance4s.integration
 import cats.effect.IO
 import munit.CatsEffectSuite
 import io.github.coinductive.yfinance4s.{YFinanceClient, YFinanceClientConfig}
-import io.github.coinductive.yfinance4s.models.{Interval, Ticker}
+import io.github.coinductive.yfinance4s.models.{Interval, Range, Ticker}
 
 import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.*
@@ -30,6 +30,16 @@ class ChartsSpec extends CatsEffectSuite {
           val prices = List(q.open, q.high, q.low, q.close, q.adjclose)
           assert(prices.forall(!_.isNaN), s"expected every price of the ${q.datetime} bar, got $prices")
         }
+      }
+    }
+  }
+
+  test("getChart for SPY reads hourly bars, which Yahoo sends without adjusted closes") {
+    YFinanceClient.resource[IO](config).use { client =>
+      client.charts.getChart(Ticker("SPY"), Interval.`1Hour`, Range.`5Days`).map { chart =>
+        val quotes = chart.getOrElse(fail("expected chart data")).quotes
+        assert(quotes.nonEmpty, "five days span trading hours")
+        quotes.foreach(q => assertEquals(q.adjclose, q.close, s"adjusted close of the ${q.datetime} bar"))
       }
     }
   }

@@ -53,7 +53,8 @@ object ChartResult {
     * @param low
     *   Lowest price during the period.
     * @param adjclose
-    *   Adjusted closing price (accounts for dividends and splits); equal to `close` where Yahoo reports none.
+    *   Adjusted closing price (accounts for dividends and splits); equal to `close` where Yahoo reports none, which
+    *   includes every bar of an intraday chart.
     * @param repaired
     *   Whether any O/H/L/C/Adj Close or volume value in this bar was altered by price repair (see
     *   [[PriceRepairConfig]]). Always false when repair is disabled.

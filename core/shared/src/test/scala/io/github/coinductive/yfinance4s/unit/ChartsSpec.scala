@@ -52,6 +52,23 @@ class ChartsSpec extends CatsEffectSuite {
   private val dividendOnEmptyDay =
     s"""{"dividends": {"$emptyDayEpoch": {"amount": 2.25, "date": $emptyDayEpoch}}}"""
 
+  private val spy = Ticker("SPY")
+  private val halfDay = ZonedDateTime.of(2025, 11, 28, 0, 0, 0, 0, ZoneOffset.UTC)
+
+  /** SPY's hourly bars for the 2025-11-28 half-day as Yahoo serves them: no adjusted closes, no data at 17:30 UTC. */
+  private val spyHalfDayHourly =
+    """{"chart": {"result": [{
+      |  "meta": {"currency": "USD", "symbol": "SPY", "exchangeName": "PCX", "instrumentType": "ETF",
+      |    "regularMarketTime": 1792785600, "gmtoffset": -14400, "timezone": "EDT",
+      |    "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 759.97, "dataGranularity": "1h", "range": ""},
+      |  "timestamp": [1764340200, 1764343800, 1764347400, 1764351000, 1764352800],
+      |  "indicators": {
+      |    "quote": [{"open": [680.86, 681.69, 682.16, null, 682.315], "high": [682.32, 682.94, 683.0, null, 683.45],
+      |      "low": [680.5, 681.61, 681.8, null, 674.715], "close": [681.69, 682.15, 682.315, null, 683.11],
+      |      "volume": [9771492, 8375543, 9614422, null, 0]}]
+      |  }
+      |}], "error": null}}""".stripMargin
+
   test("getChart leaves out a row Yahoo reports without prices") {
     chartsServing(londonDaily()).flatMap(_.getChart(london, Interval.`1Day`, since, until)).map { chart =>
       val quotes = chart.getOrElse(fail("expected chart data")).quotes
@@ -102,5 +119,11 @@ class ChartsSpec extends CatsEffectSuite {
     chartsServing(londonDaily(events = Some(dividendOnEmptyDay)))
       .flatMap(_.getDividends(london, Interval.`1Day`, since, until))
       .map(dividends => assertEquals(dividends, Some(List(DividendEvent(londonDay(30), 2.25)))))
+  }
+
+  test("getChart reports an hourly bar's close as its adjusted close") {
+    chartsServing(spyHalfDayHourly)
+      .flatMap(_.getChart(spy, Interval.`1Hour`, halfDay, halfDay.plusDays(1)))
+      .map(chart => assertEquals(chart.map(_.quotes.map(_.adjclose)), Some(List(681.69, 682.15, 682.315, 683.11))))
   }
 }

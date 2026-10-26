@@ -73,7 +73,8 @@ private[yfinance4s] object TradingPeriodRaw {
   implicit val decoder: Decoder[TradingPeriodRaw] = deriveDecoder
 }
 
-private[yfinance4s] final case class Indicators(quote: NonEmptyList[Quote], adjclose: NonEmptyList[AdjClose])
+// Yahoo sends no `adjclose` for an intraday interval.
+private[yfinance4s] final case class Indicators(quote: NonEmptyList[Quote], adjclose: Option[NonEmptyList[AdjClose]])
 
 private[yfinance4s] object Indicators {
   implicit val decoder: Decoder[Indicators] = deriveDecoder

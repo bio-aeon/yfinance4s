@@ -46,7 +46,7 @@ class PriceRepairConfigSpec extends FunSuite {
           indicators = Indicators(
             quote =
               NonEmptyList.one(Quote(close = values, open = values, volume = volumes, high = values, low = values)),
-            adjclose = NonEmptyList.one(AdjClose(values))
+            adjclose = Some(NonEmptyList.one(AdjClose(values)))
           ),
           events = None
         )

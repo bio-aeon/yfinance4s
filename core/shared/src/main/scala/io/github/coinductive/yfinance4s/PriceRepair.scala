@@ -206,12 +206,11 @@ private[yfinance4s] object PriceRepair {
   def toBars(data: InstrumentData): Vector[Bar] = {
     def price(cell: Option[Double]): Double = cell.getOrElse(Double.NaN)
     val quote = data.indicators.quote.head
-    val adjclose = data.indicators.adjclose.head
     val opens = quote.open.toVector
     val highs = quote.high.toVector
     val lows = quote.low.toVector
     val closes = quote.close.toVector
-    val adjCloses = adjclose.adjclose.toVector
+    val adjCloses = data.indicators.adjclose.fold(closes)(_.head.adjclose.toVector)
     val volumes = quote.volume.toVector
 
     val dividendAmounts: Map[Long, Double] =

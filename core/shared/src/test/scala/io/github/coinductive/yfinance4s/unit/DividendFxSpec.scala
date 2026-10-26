@@ -52,7 +52,7 @@ class DividendFxSpec extends FunSuite {
         quote = NonEmptyList.one(
           Quote(close = prices, open = prices, volume = List.fill(4)(Option(1000L)), high = prices, low = prices)
         ),
-        adjclose = NonEmptyList.one(AdjClose(prices))
+        adjclose = Some(NonEmptyList.one(AdjClose(prices)))
       ),
       events = Some(
         Events(
@@ -77,7 +77,7 @@ class DividendFxSpec extends FunSuite {
           indicators = Indicators(
             quote =
               NonEmptyList.one(Quote(close = values, open = values, volume = volumes, high = values, low = values)),
-            adjclose = NonEmptyList.one(AdjClose(values))
+            adjclose = Some(NonEmptyList.one(AdjClose(values)))
           ),
           events = None
         )
