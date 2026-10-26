@@ -46,7 +46,18 @@ private[yfinance4s] final case class ChartMetaRaw(
     range: String,
     validRanges: Option[List[String]],
     hasPrePostMarketData: Option[Boolean]
-)
+) {
+
+  /** The regular session Yahoo reports as current, when the latest regular-market print falls inside it. While an
+    * exchange is closed, Yahoo reports its last session or already the next one, and the print lies outside either.
+    */
+  def openRegularSession: Option[TradingPeriodRaw] =
+    for {
+      session <- currentTradingPeriod.flatMap(_.regular)
+      latestPrint <- regularMarketTime
+      if session.contains(latestPrint)
+    } yield session
+}
 
 private[yfinance4s] object ChartMetaRaw {
   implicit val decoder: Decoder[ChartMetaRaw] = deriveDecoder
@@ -67,7 +78,11 @@ private[yfinance4s] final case class TradingPeriodRaw(
     start: Long,
     end: Long,
     gmtoffset: Long
-)
+) {
+
+  /** Whether the epoch second falls within the session. The end is excluded: Yahoo stamps the closing print at it. */
+  def contains(epochSecond: Long): Boolean = start <= epochSecond && epochSecond < end
+}
 
 private[yfinance4s] object TradingPeriodRaw {
   implicit val decoder: Decoder[TradingPeriodRaw] = deriveDecoder

@@ -58,6 +58,9 @@ object ChartResult {
     * @param repaired
     *   Whether any O/H/L/C/Adj Close or volume value in this bar was altered by price repair (see
     *   [[PriceRepairConfig]]). Always false when repair is disabled.
+    * @param inProgress
+    *   Whether this daily bar's session was still open at the latest price Yahoo reported in the same response: its
+    *   close is that price, and its high, low and volume may still change. Always false on charts of other intervals.
     */
   final case class Quote(
       datetime: ZonedDateTime,
@@ -67,6 +70,7 @@ object ChartResult {
       high: Double,
       low: Double,
       adjclose: Double,
-      repaired: Boolean = false
+      repaired: Boolean = false,
+      inProgress: Boolean = false
   )
 }

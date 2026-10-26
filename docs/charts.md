@@ -24,6 +24,8 @@ Yahoo occasionally reports a timestamp without any prices, for a day it has no d
 
 Yahoo sends no adjusted closes for intraday intervals, so on an intraday chart each quote's `adjclose` equals its `close`.
 
+While a session is open, a daily chart ends with a bar for that session whose close is the latest price. That quote carries `inProgress = true`, so `chart.quotes.filterNot(_.inProgress)` keeps only sessions that have closed. Quotes of other intervals are never marked.
+
 ## Date Range Queries
 
 ```scala

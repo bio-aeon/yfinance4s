@@ -43,4 +43,14 @@ class ChartsSpec extends CatsEffectSuite {
       }
     }
   }
+
+  test("getChart for BTC-USD marks today's daily bar in progress, as the market never closes") {
+    YFinanceClient.resource[IO](config).use { client =>
+      client.charts.getChart(Ticker("BTC-USD"), Interval.`1Day`, Range.`5Days`).map { chart =>
+        val flags = chart.getOrElse(fail("expected chart data")).quotes.map(_.inProgress)
+        assertEquals(flags.lastOption, Some(true), "today's bar")
+        assert(!flags.init.contains(true), s"expected only today's bar in progress, got $flags")
+      }
+    }
+  }
 }

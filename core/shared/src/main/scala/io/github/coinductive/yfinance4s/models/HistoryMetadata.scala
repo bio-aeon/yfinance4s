@@ -5,7 +5,7 @@ import io.github.coinductive.yfinance4s.models.internal.{ChartMetaRaw, TradingPe
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 
-/** A single trading-session window (regular, pre-market, or post-market) for an instrument's current day.
+/** A single trading-session window (regular, pre-market, or post-market) of the session Yahoo reports as current.
   *
   * @param start
   *   Session start, in UTC. Convert with the exchange offset for local wall-clock time.
@@ -23,8 +23,9 @@ final case class TradingPeriod(
     timezoneShortName: String
 )
 
-/** The current day's trading-session windows. `regular` is always present when Yahoo emits a trading-period block;
-  * `pre` and `post` are present only for instruments with extended-hours sessions.
+/** The trading-session windows Yahoo reports as current: those of the session in progress or, while the exchange is
+  * closed, of its last session or already the next one. `regular` is always present when Yahoo emits a trading-period
+  * block; `pre` and `post` are present only for instruments with extended-hours sessions.
   */
 final case class TradingPeriods(
     regular: TradingPeriod,
@@ -68,7 +69,7 @@ final case class TradingPeriods(
   * @param priceHint
   *   Number of decimal places Yahoo recommends for display/rounding, where supplied.
   * @param currentTradingPeriod
-  *   The current day's session windows, where supplied. See [[TradingPeriods]].
+  *   The session windows Yahoo reports as current, where supplied. See [[TradingPeriods]].
   * @param dataGranularity
   *   The granularity (resolved interval) echoed by Yahoo for the probe request (e.g. "1d"). Always present.
   * @param range

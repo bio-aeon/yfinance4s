@@ -123,10 +123,16 @@ private[yfinance4s] object PriceRepair {
     val empty: Reconstruction = Reconstruction(Map.empty, Map.empty)
   }
 
-  /** Everything the pure pipeline computed up to the effect boundary: the source data, the transformed bars, the
-    * zero/NaN tags awaiting reconstruction (empty when nothing to do), and the effective price currency.
+  /** Everything the pure pipeline computed up to the effect boundary: the source data and its interval, the transformed
+    * bars, the zero/NaN tags awaiting reconstruction (empty when nothing to do), and the effective price currency.
     */
-  final case class Prepared(data: InstrumentData, bars: Vector[Bar], tags: ZeroTags, currency: String)
+  final case class Prepared(
+      data: InstrumentData,
+      interval: Interval,
+      bars: Vector[Bar],
+      tags: ZeroTags,
+      currency: String
+  )
 
   /** Runs the pure half of the repair pipeline: currency standardisation and dividend FX application (every interval),
     * then the 100x family and zero/NaN detection (daily and intraday only). `fxRates` are the rates resolved for this
@@ -154,20 +160,23 @@ private[yfinance4s] object PriceRepair {
         val ctx = Context(meta.currency, interval, isFx = ticker.value.endsWith(FxTickerSuffix))
         val repaired = if (cfg.fix100xErrors) repairUnitMixups(converted, ctx) else converted
         val tags = if (cfg.fixZeroes) detectZeroes(repaired, ctx) else ZeroTags.empty
-        Prepared(data, repaired, tags, label)
-      } else Prepared(data, converted, ZeroTags.empty, label)
+        Prepared(data, interval, repaired, tags, label)
+      } else Prepared(data, interval, converted, ZeroTags.empty, label)
     }
 
   /** Applies the reconstruction (restoring originals for uncovered tags) and assembles the final [[ChartResult]]. A bar
-    * still missing a price yields no quote. The dividends list is rebuilt from all bars, so a switch-scaled or
-    * converted dividend surfaces as such, even on a bar left out of the quotes; splits are re-attached from the raw
-    * events unchanged.
+    * still missing a price yields no quote. A daily bar of the session open at Yahoo's latest print is marked in
+    * progress; bars of other intervals never are, since only a daily bar spans exactly one session. The dividends list
+    * is rebuilt from all bars, so a switch-scaled or converted dividend surfaces as such, even on a bar left out of the
+    * quotes; splits are re-attached from the raw events unchanged.
     */
   def complete(prepared: Prepared, recon: Reconstruction): ChartResult = {
     val bars = applyReconstruction(prepared.bars, prepared.tags, recon)
+    val openSession = if (prepared.interval == Interval.`1Day`) prepared.data.meta.openRegularSession else None
     val quotes = bars.collect {
       case b if hasEveryPrice(b) =>
-        ChartResult.Quote(b.datetime, b.close, b.open, b.volume, b.high, b.low, b.adjClose, b.repaired)
+        val inProgress = openSession.exists(_.contains(b.datetime.toEpochSecond))
+        ChartResult.Quote(b.datetime, b.close, b.open, b.volume, b.high, b.low, b.adjClose, b.repaired, inProgress)
     }.toList
     ChartResult(quotes, rebuiltDividends(prepared.data, bars), rawSplits(prepared.data), prepared.currency)
   }
