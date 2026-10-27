@@ -55,6 +55,15 @@ class ChartsSpec extends CatsEffectSuite {
     }
   }
 
+  test("getChart for SPY returns a chart without quotes for a weekend") {
+    val weekend = ZonedDateTime.of(2026, 7, 25, 0, 0, 0, 0, ZoneOffset.UTC)
+    YFinanceClient.resource[IO](config).use { client =>
+      client.charts.getChart(Ticker("SPY"), Interval.`1Hour`, weekend, weekend.plusDays(2)).map { chart =>
+        assertEquals(chart.map(_.quotes), Some(Nil))
+      }
+    }
+  }
+
   test("getChart for SPY keeps the hourly bars of a past window inside it") {
     YFinanceClient.resource[IO](config).use { client =>
       client.charts.getChart(Ticker("SPY"), Interval.`1Hour`, since, until).map { chart =>

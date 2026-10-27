@@ -12,7 +12,7 @@ import java.time.ZonedDateTime
   * @param quotes
   *   List of OHLCV price quotes, sorted chronologically. A timestamp for which Yahoo reports no prices yields no quote;
   *   a dividend or split on it is still listed. The row Yahoo adds for its latest price is folded into the quote it
-  *   falls in, or left out where it lies outside a requested date range.
+  *   falls in, or left out where it lies outside a requested date range. Empty for a window without a trading session.
   * @param dividends
   *   List of dividend events within the chart period, sorted chronologically.
   * @param splits

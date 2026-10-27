@@ -54,42 +54,60 @@ class ChartsSpec extends CatsEffectSuite {
 
   private val spy = Ticker("SPY")
   private val halfDay = ZonedDateTime.of(2025, 11, 28, 0, 0, 0, 0, ZoneOffset.UTC)
+  private val weekend = ZonedDateTime.of(2026, 7, 25, 0, 0, 0, 0, ZoneOffset.UTC)
+
+  /** SPY's `meta` block as Yahoo served it before the 2026-10-26 session, for a chart of the given granularity. */
+  private def spyMeta(granularity: String): String =
+    s"""{"currency": "USD", "symbol": "SPY", "exchangeName": "PCX", "instrumentType": "ETF",
+       |    "regularMarketTime": 1792785600, "gmtoffset": -14400, "timezone": "EDT",
+       |    "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 759.97,
+       |    "dataGranularity": "$granularity", "range": ""}""".stripMargin
 
   /** SPY's hourly bars for the 2025-11-28 half-day as Yahoo serves them: no adjusted closes, no data at 17:30 UTC. */
   private val spyHalfDayHourly =
-    """{"chart": {"result": [{
-      |  "meta": {"currency": "USD", "symbol": "SPY", "exchangeName": "PCX", "instrumentType": "ETF",
-      |    "regularMarketTime": 1792785600, "gmtoffset": -14400, "timezone": "EDT",
-      |    "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 759.97, "dataGranularity": "1h",
-      |    "range": ""},
-      |  "timestamp": [1764340200, 1764343800, 1764347400, 1764351000, 1764352800],
-      |  "indicators": {
-      |    "quote": [{"open": [680.86, 681.69, 682.16, null, 682.315], "high": [682.32, 682.94, 683.0, null, 683.45],
-      |      "low": [680.5, 681.61, 681.8, null, 674.715], "close": [681.69, 682.15, 682.315, null, 683.11],
-      |      "volume": [9771492, 8375543, 9614422, null, 0]}]
-      |  }
-      |}], "error": null}}""".stripMargin
+    s"""{"chart": {"result": [{
+       |  "meta": ${spyMeta("1h")},
+       |  "timestamp": [1764340200, 1764343800, 1764347400, 1764351000, 1764352800],
+       |  "indicators": {
+       |    "quote": [{"open": [680.86, 681.69, 682.16, null, 682.315], "high": [682.32, 682.94, 683.0, null, 683.45],
+       |      "low": [680.5, 681.61, 681.8, null, 674.715], "close": [681.69, 682.15, 682.315, null, 683.11],
+       |      "volume": [9771492, 8375543, 9614422, null, 0]}]
+       |  }
+       |}], "error": null}}""".stripMargin
 
   /** SPY's last two hourly bars for 2026-07-27 to 2026-07-31 as Yahoo served the window before the 2026-10-26 session,
     * followed by its latest-price row from 2026-10-23.
     */
   private val spyPastHourly =
-    """{"chart": {"result": [{
-      |  "meta": {"currency": "USD", "symbol": "SPY", "exchangeName": "PCX", "instrumentType": "ETF",
-      |    "regularMarketTime": 1792785600, "gmtoffset": -14400, "timezone": "EDT",
-      |    "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 759.97, "dataGranularity": "1h",
-      |    "range": ""},
-      |  "timestamp": [1785522600, 1785526200, 1792785600],
-      |  "indicators": {
-      |    "quote": [{
-      |      "open": [746.04, 747.49, 759.97],
-      |      "high": [747.92, 748.895, 759.97],
-      |      "low": [745.67, 746.34, 759.97],
-      |      "close": [747.49, 746.81, 759.97],
-      |      "volume": [7842744, 10315583, 0]
-      |    }]
-      |  }
-      |}], "error": null}}""".stripMargin
+    s"""{"chart": {"result": [{
+       |  "meta": ${spyMeta("1h")},
+       |  "timestamp": [1785522600, 1785526200, 1792785600],
+       |  "indicators": {
+       |    "quote": [{
+       |      "open": [746.04, 747.49, 759.97],
+       |      "high": [747.92, 748.895, 759.97],
+       |      "low": [745.67, 746.34, 759.97],
+       |      "close": [747.49, 746.81, 759.97],
+       |      "volume": [7842744, 10315583, 0]
+       |    }]
+       |  }
+       |}], "error": null}}""".stripMargin
+
+  /** SPY's daily chart for the weekend from 2026-07-25 as Yahoo serves it: no `timestamp`, and quote objects that hold
+    * no columns.
+    */
+  private val spyWeekendDaily =
+    s"""{"chart": {"result": [{
+       |  "meta": ${spyMeta("1d")},
+       |  "indicators": {"quote": [{}], "adjclose": [{}]}
+       |}], "error": null}}""".stripMargin
+
+  /** SPY's hourly chart for the same weekend, which comes without the adjusted-close object. */
+  private val spyWeekendHourly =
+    s"""{"chart": {"result": [{
+       |  "meta": ${spyMeta("1h")},
+       |  "indicators": {"quote": [{}]}
+       |}], "error": null}}""".stripMargin
 
   private val toyota = Ticker("7203.T")
 
@@ -238,5 +256,23 @@ class ChartsSpec extends CatsEffectSuite {
     chartsServing(spyPastHourly)
       .flatMap(_.getChart(spy, Interval.`1Hour`, since, until))
       .map(chart => assertEquals(chart.map(_.quotes.map(_.datetime)), Some(lastTwoHours)))
+  }
+
+  test("getChart returns a chart without quotes for a daily window without a session") {
+    chartsServing(spyWeekendDaily)
+      .flatMap(_.getChart(spy, Interval.`1Day`, weekend, weekend.plusDays(2)))
+      .map(chart => assertEquals(chart, Some(ChartResult(quotes = Nil, currency = "USD"))))
+  }
+
+  test("getChart returns a chart without quotes for an hourly window without a session") {
+    chartsServing(spyWeekendHourly)
+      .flatMap(_.getChart(spy, Interval.`1Hour`, weekend, weekend.plusDays(2)))
+      .map(chart => assertEquals(chart, Some(ChartResult(quotes = Nil, currency = "USD"))))
+  }
+
+  test("getChart with repair returns a chart without quotes for a window without a session") {
+    chartsServing(spyWeekendDaily)
+      .flatMap(_.getChart(spy, Interval.`1Day`, weekend, weekend.plusDays(2), PriceRepairConfig.Enabled))
+      .map(chart => assertEquals(chart, Some(ChartResult(quotes = Nil, currency = "USD"))))
   }
 }

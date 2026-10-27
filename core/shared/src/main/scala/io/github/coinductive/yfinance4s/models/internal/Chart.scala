@@ -15,7 +15,7 @@ private[yfinance4s] object Chart {
 }
 
 // Yahoo ships `meta` on every instrument payload; an error envelope carries no payload at all (result: null),
-// so a missing `meta` is a malformed response and fails decoding like a missing `indicators` would.
+// so a missing `meta` is a malformed response and fails decoding.
 private[yfinance4s] final case class InstrumentData(
     meta: ChartMetaRaw,
     timestamp: List[Long],
@@ -24,7 +24,20 @@ private[yfinance4s] final case class InstrumentData(
 )
 
 private[yfinance4s] object InstrumentData {
-  implicit val decoder: Decoder[InstrumentData] = deriveDecoder
+
+  // For a window without a session, Yahoo sends no `timestamp` and quote objects that hold no columns: an instrument
+  // without rows, whose indicators are not read.
+  implicit val decoder: Decoder[InstrumentData] = Decoder.instance { c =>
+    for {
+      meta <- c.downField("meta").as[ChartMetaRaw]
+      timestamp <- c.downField("timestamp").as[Option[List[Long]]]
+      indicators <- timestamp match {
+        case Some(_) => c.downField("indicators").as[Indicators]
+        case None    => Right(Indicators.WithoutRows)
+      }
+      events <- c.downField("events").as[Option[Events]]
+    } yield InstrumentData(meta, timestamp.getOrElse(Nil), indicators, events)
+  }
 }
 
 private[yfinance4s] final case class ChartMetaRaw(
@@ -92,6 +105,10 @@ private[yfinance4s] object TradingPeriodRaw {
 private[yfinance4s] final case class Indicators(quote: NonEmptyList[Quote], adjclose: Option[NonEmptyList[AdjClose]])
 
 private[yfinance4s] object Indicators {
+
+  val WithoutRows: Indicators =
+    Indicators(NonEmptyList.one(Quote(close = Nil, open = Nil, volume = Nil, high = Nil, low = Nil)), adjclose = None)
+
   implicit val decoder: Decoder[Indicators] = deriveDecoder
 }
 
